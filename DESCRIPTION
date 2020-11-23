@@ -1,7 +1,7 @@
 Package: multifammPaper
 Type: Package
 Title: Functions for the Analysis of the multiFAMM Paper
-Version: 0.1.0
+Version: 0.1.0.9000
 Authors@R: person("Alexander", "Volkmann", 
     email = "alexander.volkmann@hu-berlin.de", role = c("aut", "cre"))
 Description: Functions contained in the analysis of the multiFAMM Paper but not

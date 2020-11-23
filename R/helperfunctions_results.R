@@ -413,6 +413,7 @@ extract_Covfct_sim_uni <- function (term, term_uni, m_true_comp, cov_preds) {
 #'
 #' @param fitted_cu Object saved from the simulation.
 #' @inheritParams sim_eval_components
+#' @export
 compute_fitted_sim <- function (fitted_cu, I = 10, J = 16, reps = 5,
                                 nested = FALSE) {
 
@@ -491,6 +492,7 @@ compute_fitted_sim <- function (fitted_cu, I = 10, J = 16, reps = 5,
 #'     multiFunData object).
 #'     \item \code{obs} (int): the number of the observation in the funData
 #'     object.}
+#' @export
 funData2DataFrame <- function(fundata) {
 
   # Automatic checking if the funData object belongs to class multiFunData
@@ -544,6 +546,7 @@ funData2DataFrame <- function(fundata) {
 #'   eigenfunctions are not evaluated. Defaults to TRUE.
 #' @param sigma2 Vector of true values can be supplied if they differ from the
 #'   values in m_true_comp. Defaults to NULL.
+#' @export
 sim_eval_components <- function (folder, m_true_comp, label_cov,
                                  relative = TRUE, I = 9, J = 16, reps = 5,
                                  nested = FALSE, fixed_fpc = TRUE,
@@ -802,6 +805,7 @@ sim_eval_components <- function (folder, m_true_comp, label_cov,
 #' @inheritParams sim_eval_components
 #' @param uni_compare TRUE if the simulation scenario includes univariate model
 #'   estimates that should be also evaluated. Defaults to FALSE.
+#' @param export
 sim_eval_dimensions <- function (folder, m_true_comp, label_cov,
                                  relative = TRUE, uni_compare = FALSE,
                                  I = 9, J = 16, reps = 5, nested = FALSE) {
@@ -1133,14 +1137,14 @@ sim_eval_dimensions <- function (folder, m_true_comp, label_cov,
 #------------------------------------------------------------------------------#
 # Estimate Covariance Surface
 #------------------------------------------------------------------------------#
+#' Estimate Covariance Surface
+#' @param vals Eigenvalues (Vector).
+#' @param fcts Eigenfunctions (MultiFunData).
+#' @param dim1 Choose first dimension (Scalar).
+#' @param dim2 Choose second dimension (Scalar).
+#' @param multi Is the input multivariate (if not then vals and fcts are lists).
+#' @export
 covSurv <- function (vals, fcts, dim1, dim2, multi = TRUE) {
-
-  # Arguments
-  # vals   : Eigenvalues (Vector)
-  # fcts   : Eigenfunctions (MultiFunData)
-  # dim1   : Choose first dimension (Scalar)
-  # dim2   : Choose second dimension (Scalar)
-  # multi  : Is the input multivariate (if not then vals and fcts are lists)
 
   if (multi == TRUE) {
 
@@ -1179,14 +1183,15 @@ covSurv <- function (vals, fcts, dim1, dim2, multi = TRUE) {
 #------------------------------------------------------------------------------#
 # Plot Covariate Effects Together
 #------------------------------------------------------------------------------#
+#' Plot Covariate Effects Together
+#' @param m_true_comp True model components.
+#' @param effects Number of effect function to be plotted.
+#' @param m_fac Multiplication factor.
+#' @param limits Y-limits for the plot.
+#' @param dimlabels Labels for the dimensions in the plot.
+#' @export
 covariate_plot <- function (m_true_comp, effects = c(4, 5, 6), m_fac = 2,
                             limits = limits, dimlabels = c("ACO", "EPG")) {
-
-  # Arguments
-  # m_true_comp   : True model components
-  # effects       : Number of effect function to be plotted
-  # m_fac         : Multiplication factor
-  # limits        : Y-limits for the plot
 
   # Extract covariate information
   covars <- lapply(effects, function (x) {
@@ -1249,6 +1254,7 @@ covariate_plot <- function (m_true_comp, effects = c(4, 5, 6), m_fac = 2,
 #' @param type Gam terms to be predicted.
 #' @param unconditional Std conditional on lambda.
 #' @param grid Grid of evaluation points. Defaults to observations on [0,1].
+#' @export
 predict_sparseFLMM_covar <- function (model, type = "terms",
                                       unconditional = FALSE,
                                       grid = seq(0, 1, length.out = 100)) {
@@ -1301,6 +1307,7 @@ predict_sparseFLMM_covar <- function (model, type = "terms",
 #' @param effect Which effect to extract. If intercept is specified (1), then
 #'   the scalar intercept is added.
 #' @param grid Grid of evaluation points. Defaults to observations on [0,1].
+#' @export
 predictedUnivar2DataFrame <- function (aco_pr, epg_pr, effect,
                                        grid = seq(0, 1, length.out = 100)) {
 
@@ -1333,19 +1340,20 @@ predictedUnivar2DataFrame <- function (aco_pr, epg_pr, effect,
 #------------------------------------------------------------------------------#
 # Plot the Comparison of Univariate and Multivariate Covariate Effects
 #------------------------------------------------------------------------------#
+#' Plot the Comparison of Univariate and Multivariate Covariate Effects
+#' @param m_true_comp Model components of the multivariate model.
+#' @param aco_pr Predictions for aco model.
+#' @param epg_pr Predictions for epg model.
+#' @param effects Index number of the effects to be plotted from multivariate
+#'   model.
+#' @param effects_uni Index number of the effects to be plotted from the
+#'   univariate
+#' @param m_fac Multiplication factor.
+#' @param limits Y-limits of the Plot.
+#' @export
 cova_comp_plot <- function (m_true_comp, aco_pr, epg_pr,
                             effects = c(4, 5, 6), effects_uni = c(5, 6, 7),
                             m_fac = 2, limits = limits) {
-
-  # Arguments
-  # m_true_comp : Model components of the multivariate model
-  # aco_pr      : Predictions for aco model
-  # epg_pr      : Predictions for epg model
-  # effects     : Index number of the effects to be plotted from multivariate m
-  # effects_uni : Index number of the effects to be plotted from the univariate
-  # m_fac       : Multiplication factor
-  # limits      : Y-limits of the Plot
-
 
   # List of data.frames of covariate effects for multivariate model
   covars <- lapply(effects, function (x) {
@@ -1437,6 +1445,11 @@ cova_comp_plot <- function (m_true_comp, aco_pr, epg_pr,
 #------------------------------------------------------------------------------#
 # Convert Univariate Estimates of Eigenfunctions to Data.frame
 #------------------------------------------------------------------------------#
+#' Convert Univariate Estimates of Eigenfunctions to Data.frame
+#' @param phi_aco Univariate eigenfunction for model aco.
+#' @param phi_epg Univariate eigenfunction for model epg.
+#' @param grid Grid of evaluation points.
+#' @export
 fpc2DataFrame <- function(phi_aco, phi_epg, grid = seq(0,1, length.out = 100)) {
 
   # Arguments
@@ -1459,12 +1472,11 @@ fpc2DataFrame <- function(phi_aco, phi_epg, grid = seq(0,1, length.out = 100)) {
 #------------------------------------------------------------------------------#
 # Compute the Surface of a Covariance Compoent and Convert it to Data.Frame
 #------------------------------------------------------------------------------#
+#' Compute the Surface of a Covariance Compoent and Convert it to Data.Frame
+#' @param m_aco Univariate model on dimension aco.
+#' @param m_epg  Univariate model on dimension epg.
+#' @param component Covariance component to extract
 cov2DataFrame <- function(m_aco, m_epg, component) {
-
-  # Arguments
-  # m_aco     : Univariate model on dimension aco
-  # m_epg     : Univariate model on dimension epg
-  # component : Covariance component to extract
 
   dimnames <- c("ACO", "EPG")
 
@@ -1524,6 +1536,7 @@ cov2DataFrame <- function(m_aco, m_epg, component) {
 #' @param component String of the model components to be loaded.
 #' @param uni Extract also the univariate part of the components. Defaults to
 #'   FALSE.
+#' @export
 load_sim_results <- function (folder, component, uni = FALSE) {
 
   # load all elements of the folder that have the component in its name
@@ -1564,6 +1577,7 @@ load_sim_results <- function (folder, component, uni = FALSE) {
 #' per component.
 #'
 #' @inheritParams load_sim_results
+#' @export
 return_number_fpcs <- function (folder, uni = FALSE) {
 
   # Use the eigenvalues to count the number of selected components
@@ -1614,6 +1628,7 @@ return_number_fpcs <- function (folder, uni = FALSE) {
 #'   Defaults to TRUE which is the multivariate estimate.
 #'
 #' @inheritParams sim_eval_components
+#' @export
 compute_mu_sim <- function (fitted_cu, ran_preds, I = 10, J = 16, reps = 5,
                             nested = FALSE, mul = TRUE) {
 
