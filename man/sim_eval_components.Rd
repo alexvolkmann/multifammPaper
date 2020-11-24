@@ -33,7 +33,7 @@ eigenfunctions are not evaluated. Defaults to TRUE.}
 values in m_true_comp. Defaults to NULL.}
 }
 \description{
-This is an internal function. The function takes the folder containing the
+This function takes the folder containing the
 results of a simulation scenario and returns a data frame with relative
 MSE values for the separate model components.
 }

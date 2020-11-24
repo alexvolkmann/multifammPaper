@@ -20,7 +20,7 @@ A data.frame with four variables
     object.}
 }
 \description{
-This is an internal function. It transform a funData object to a data.frame
+This function transform a funData object to a data.frame
 so that it is easy to plot it using ggplot. It internally checks if the
 object is a multiFunData object.
 }

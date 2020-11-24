@@ -29,7 +29,7 @@ estimates that should be also evaluated. Defaults to FALSE.}
 \item{nested}{TRUE if the model component C is nested. Defaults to FALSE.}
 }
 \description{
-This is an internal function. The function takes the folder containing the
+This function takes the folder containing the
 results of a simulation scenario and returns a data frame with relative
 MSE values for the separate model components and the separate dimensions.
 }

@@ -18,6 +18,6 @@ compute_fitted_sim(fitted_cu, I = 10, J = 16, reps = 5, nested = FALSE)
 \item{nested}{TRUE if the model component C is nested. Defaults to FALSE.}
 }
 \description{
-This is an internal function. It takes the fitted curves object of the
+This function takes the fitted curves object of the
 simulation and recalculates the true curves.
 }

@@ -18,7 +18,7 @@ mrrMSE? Defaults to FALSE.}
 relative MSE (TRUE).}
 }
 \description{
-This is an internal function. Calculate the multivariate root (relative) mean
+This function calculates the multivariate root (relative) mean
 squared error for functions. For eigenfunctions, which are only defined up to
 a sign change, there is the option to flip the functions first if the flipped
 functions seems to be closer to the true function

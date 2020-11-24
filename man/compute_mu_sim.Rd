@@ -24,7 +24,7 @@ compute_mu_sim(fitted_cu, ran_preds, I = 10, J = 16, reps = 5,
 Defaults to TRUE which is the multivariate estimate.}
 }
 \description{
-This is an internal function. It takes the fitted curves object of the
+This function takes the fitted curves object of the
 simulation and the random effects object and calculates the estimated mu
 functions.
 }

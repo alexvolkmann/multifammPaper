@@ -1,11 +1,11 @@
 Package: multifammPaper
 Type: Package
-Title: Functions for the Analysis of the multiFAMM Paper
+Title: Convenience Functions for the Analysis of the multiFAMM Paper
 Version: 0.1.0.9000
 Authors@R: person("Alexander", "Volkmann", 
     email = "alexander.volkmann@hu-berlin.de", role = c("aut", "cre"))
-Description: Functions contained in the analysis of the multiFAMM Paper but not
-    fit for publication on CRAN.
+Description: Convenience functions used in the analysis of the multiFAMM Paper 
+    but not fit for publication on CRAN.
 License: GPL-3
 Encoding: UTF-8
 LazyData: true

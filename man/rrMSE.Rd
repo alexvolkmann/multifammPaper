@@ -15,6 +15,6 @@ rrMSE(theta_true, theta_estim, relative = TRUE)
 relative MSE (TRUE).}
 }
 \description{
-This is an internal function. It calculates the root (relative) mean squared
+This function calculates the root (relative) mean squared
 error for scalar quantities.
 }

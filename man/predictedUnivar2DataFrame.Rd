@@ -18,7 +18,7 @@ the scalar intercept is added.}
 \item{grid}{Grid of evaluation points. Defaults to observations on [0,1].}
 }
 \description{
-This is an internal function that helps to compare univariate sparseFLMM
+This function helps to compare univariate sparseFLMM
 models to multiFAMM models. This functions converts the predictions of the
 covariate effects of one or two models as given by the function
 predict_sparseFLMM_covar() to a data.frame.

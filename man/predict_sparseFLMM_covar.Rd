@@ -17,7 +17,7 @@ predict_sparseFLMM_covar(model, type = "terms", unconditional = FALSE,
 \item{grid}{Grid of evaluation points. Defaults to observations on [0,1].}
 }
 \description{
-This is an internal function that helps to compare univariate sparseFLMM
+This function helps to compare univariate sparseFLMM
 models to multiFAMM models. This functions predicts the covariate effects of
 a model that has the structure of a regression model fitted by sparseFLMM().
 }

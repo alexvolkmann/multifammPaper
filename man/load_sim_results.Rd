@@ -15,7 +15,7 @@ load_sim_results(folder, component, uni = FALSE)
 FALSE.}
 }
 \description{
-This is an internal function. It takes the a folder containing simulation
+This function takes the a folder containing simulation
 results and what part of the model is to be loaded. It then loads all
 corresponding results and concatenates them.
 }

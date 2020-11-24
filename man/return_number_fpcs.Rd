@@ -13,7 +13,7 @@ return_number_fpcs(folder, uni = FALSE)
 FALSE.}
 }
 \description{
-This is an internal function. It takes the a folder containing simulation
+This function takes the a folder containing simulation
 results and returns a data set which contains the number of selected FPCS
 per component.
 }

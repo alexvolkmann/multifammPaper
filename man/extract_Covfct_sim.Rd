@@ -19,7 +19,7 @@ by e.g. load_sim_results()).}
 estimated function. Defaults to FALSE.}
 }
 \description{
-This is an internal function. The function extracts one single effect
+This function extracts one single effect
 function from the simulated effects and adds the true observation as the last
 observation.
 }
