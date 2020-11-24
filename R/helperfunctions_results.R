@@ -17,7 +17,7 @@
 #------------------------------------------------------------------------------#
 #' Root (Relative) Mean Squared Error for Scalar Estimates
 #'
-#' This is an internal function. It calculates the root (relative) mean squared
+#' This function calculates the root (relative) mean squared
 #' error for scalar quantities.
 #'
 #' @param theta_true True component (scalar).
@@ -41,7 +41,7 @@ rrMSE <- function (theta_true, theta_estim, relative = TRUE) {
 #------------------------------------------------------------------------------#
 #' Multivariate Root (Relative) Mean Squared Error for Functions
 #'
-#' This is an internal function. Calculate the multivariate root (relative) mean
+#' This function calculates the multivariate root (relative) mean
 #' squared error for functions. For eigenfunctions, which are only defined up to
 #' a sign change, there is the option to flip the functions first if the flipped
 #' functions seems to be closer to the true function
@@ -73,7 +73,7 @@ mrrMSE <- function (fun_true, fun_estim, flip = FALSE, relative = TRUE) {
 #------------------------------------------------------------------------------#
 #' Univariate Root (Relative) Mean Squared Error for Functions
 #'
-#' This is an internal function. Calculate the univariate root (relative) mean
+#' This function calculates the univariate root (relative) mean
 #' squared error for functions. For eigenfunctions, which are only defined up to
 #' a sign change, there is the option to flip the functions first if the flipped
 #' functions seems to be closer to the true function
@@ -312,7 +312,7 @@ extract_Eigenfct_sim_uni <- function (number, component, eigenfcts) {
 #------------------------------------------------------------------------------#
 #' Extract the Estimated Covariate Effect for One Specific Model Term
 #'
-#' This is an internal function. The function extracts one single effect
+#' This function extracts one single effect
 #' function from the simulated effects and adds the true observation as the last
 #' observation.
 #'
@@ -408,7 +408,7 @@ extract_Covfct_sim_uni <- function (term, term_uni, m_true_comp, cov_preds) {
 #------------------------------------------------------------------------------#
 #' Compute the True Values to Compare with Fitted Values
 #'
-#' This is an internal function. It takes the fitted curves object of the
+#' This function takes the fitted curves object of the
 #' simulation and recalculates the true curves.
 #'
 #' @param fitted_cu Object saved from the simulation.
@@ -479,7 +479,7 @@ compute_fitted_sim <- function (fitted_cu, I = 10, J = 16, reps = 5,
 #------------------------------------------------------------------------------#
 #' Transform a funData object to an Data.Frame
 #'
-#' This is an internal function. It transform a funData object to a data.frame
+#' This function transform a funData object to a data.frame
 #' so that it is easy to plot it using ggplot. It internally checks if the
 #' object is a multiFunData object.
 #'
@@ -528,7 +528,7 @@ funData2DataFrame <- function(fundata) {
 #------------------------------------------------------------------------------#
 #' Evaluate the model components in the simulation
 #'
-#' This is an internal function. The function takes the folder containing the
+#' This function takes the folder containing the
 #' results of a simulation scenario and returns a data frame with relative
 #' MSE values for the separate model components.
 #'
@@ -798,7 +798,7 @@ sim_eval_components <- function (folder, m_true_comp, label_cov,
 #------------------------------------------------------------------------------#
 #' Evaluate the model components per dimension in the simulation
 #'
-#' This is an internal function. The function takes the folder containing the
+#' This function takes the folder containing the
 #' results of a simulation scenario and returns a data frame with relative
 #' MSE values for the separate model components and the separate dimensions.
 #'
@@ -1244,7 +1244,7 @@ covariate_plot <- function (m_true_comp, effects = c(4, 5, 6), m_fac = 2,
 #------------------------------------------------------------------------------#
 #' Predict The Covariate Effects of a Univariate sparseFLMM Model
 #'
-#' This is an internal function that helps to compare univariate sparseFLMM
+#' This function helps to compare univariate sparseFLMM
 #' models to multiFAMM models. This functions predicts the covariate effects of
 #' a model that has the structure of a regression model fitted by sparseFLMM().
 #'
@@ -1295,7 +1295,7 @@ predict_sparseFLMM_covar <- function (model, type = "terms",
 #------------------------------------------------------------------------------#
 #' Transform Output of Covariate Predictions of Univariate Models to Data Frame
 #'
-#' This is an internal function that helps to compare univariate sparseFLMM
+#' This function helps to compare univariate sparseFLMM
 #' models to multiFAMM models. This functions converts the predictions of the
 #' covariate effects of one or two models as given by the function
 #' predict_sparseFLMM_covar() to a data.frame.
@@ -1528,7 +1528,7 @@ cov2DataFrame <- function(m_aco, m_epg, component) {
 #------------------------------------------------------------------------------#
 #' Load All Simulation Results of Model Components of a Folder
 #'
-#' This is an internal function. It takes the a folder containing simulation
+#' This function takes the a folder containing simulation
 #' results and what part of the model is to be loaded. It then loads all
 #' corresponding results and concatenates them.
 #'
@@ -1572,7 +1572,7 @@ load_sim_results <- function (folder, component, uni = FALSE) {
 #------------------------------------------------------------------------------#
 #' Return Number of Selected FPCS per Component and Iteration
 #'
-#' This is an internal function. It takes the a folder containing simulation
+#' This function takes the a folder containing simulation
 #' results and returns a data set which contains the number of selected FPCS
 #' per component.
 #'
@@ -1618,7 +1618,7 @@ return_number_fpcs <- function (folder, uni = FALSE) {
 #------------------------------------------------------------------------------#
 #' Compute the Fitted Mean Trajectories
 #'
-#' This is an internal function. It takes the fitted curves object of the
+#' This function takes the fitted curves object of the
 #' simulation and the random effects object and calculates the estimated mu
 #' functions.
 #'

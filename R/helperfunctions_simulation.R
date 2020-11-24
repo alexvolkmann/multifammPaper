@@ -3,8 +3,8 @@
 
 #' Generate Data for Simulation
 #'
-#' This is an internal function. It creates a new data set based on already
-#' given functions.
+#' This function creates a new data set based on already a fitted model of type
+#' multiFAMM.
 #'
 #' @param I Number of levels for first grouping variable (individuals).
 #' @param J Number of levels for second grouping variable (set to NA for
@@ -68,6 +68,7 @@
 #'   around zero for each subject. Defaults to FALSE.
 #' @param trajectory TRUE: All dimensions are observed at the same time points
 #'   as would be (ideally) the case for the snooker data. Defaults to FALSE.
+#' @export
 gendata <- function(I = 10, J = 10, nested = FALSE, num_dim = 2,
                     lamB, lamC, lamE, normal = TRUE,
                     sigmasq = list(0.05, 4), dim_indep = TRUE,
@@ -857,7 +858,7 @@ gendata <- function(I = 10, J = 10, nested = FALSE, num_dim = 2,
 
 #' Predict funData Object for Unobserved Values
 #'
-#' This is an internal function. It takes a funData object and approximates the
+#' This function takes a funData object and approximates the
 #' function values for the supplied new time points using the adapted approxNA()
 #' function. The function checks whether the time points in the argument new are
 #' already included in the argvals. Predict is probably not the right word but
@@ -865,6 +866,7 @@ gendata <- function(I = 10, J = 10, nested = FALSE, num_dim = 2,
 #'
 #' @param funData funData object to be evaluated.
 #' @param new Vector containing the time points to be approximated.
+#' @export
 predict_funData <- function(funData, new) {
 
   # Are there already observations of this
@@ -892,7 +894,7 @@ predict_funData <- function(funData, new) {
 
 #' Prepare Prediction of Simulated Data Using MGCV Model Object
 #'
-#' This is an internal function. It is used to generate new data sets. It adapts
+#' This is function is used to generate new data sets. It adapts
 #' curve_info so that it has the same structure as the original data. Then, it
 #' is possible to use the predict function from mgcv.
 #'
@@ -904,6 +906,7 @@ predict_funData <- function(funData, new) {
 #' @param which_inter Symmetric matrix specifying the interaction terms (as in
 #'   sparseFLMM).
 #' @param model GAM model from which to extract the covariate functions.
+#' @export
 prepare_gam_predict <- function (data, num_cov, interaction, which_inter,
                                  model) {
 
@@ -968,7 +971,7 @@ prepare_gam_predict <- function (data, num_cov, interaction, which_inter,
 
 #' Create the Coverage Array of the Simulation
 #'
-#' This is an internal function. The function takes the index of the covariate
+#' This function takes the index of the covariate
 #' to be evaluated and then checks whether the estimated covariate effect of the
 #' simulation run covers the true data generating effect function. The output is
 #' a logical array where the first dimension gives the dimension of the data,
@@ -987,6 +990,7 @@ prepare_gam_predict <- function (data, num_cov, interaction, which_inter,
 #'   multivariate models.
 #' @param m_fac Multiplication factor used to create the upper and lower
 #'   credibility bounds. Defaults to 1.96 (ca. 95\%).
+#' @export
 create_coverage_array <- function (sim_curves, gen_curves, effect_index,
                                    uni = NULL, m_fac = 1.96) {
 
@@ -1050,7 +1054,7 @@ create_coverage_array <- function (sim_curves, gen_curves, effect_index,
 
 #' Coverage plot helper function
 #'
-#' This is an internal function. The function takes a list of arrays created by
+#' This function takes a list of arrays created by
 #' the function create_coverage_array and returns a data.frame ready for
 #' plotting.
 #'
@@ -1061,6 +1065,7 @@ create_coverage_array <- function (sim_curves, gen_curves, effect_index,
 #'   be plotted.
 #' @param dimlabels String vector of labels used in the data set. Defaults to
 #'   labels "ACO" and "EPG".
+#' @export
 coverage_plot_helper <- function (cov_list, effect_index,
                                   dimlabels = c("ACO", "EPG")) {
 

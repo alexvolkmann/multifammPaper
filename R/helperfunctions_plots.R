@@ -11,7 +11,7 @@
 
 #' Extract Data for FPC Plot
 #'
-#' This is an internal function. It gives as an output the data set necessary to
+#' This function gives as an output the data set necessary to
 #' plot the eigenfunctions. It is meant to be general enough to also include
 #' more than two dimensions.
 #'
@@ -27,6 +27,7 @@
 #' (multifamm model).
 #' @param m_fac Multiplication factor to represent the difference from the
 #' overall mean.
+#' @export
 fpc_plot_helper <- function(model, mcomp, component, dimlabels, two_d = FALSE,
                             multi = TRUE, m_fac = 2) {
 
@@ -96,7 +97,7 @@ fpc_plot_helper <- function(model, mcomp, component, dimlabels, two_d = FALSE,
 
 #' Extract Data for Covariate Plot
 #'
-#' This is an internal function. It gives as an output the data set necessary to
+#' This function gives as an output the data set necessary to
 #' plot the covariate effects. It is meant to be general enough to also include
 #' more than two dimensions.
 #'
@@ -108,6 +109,7 @@ fpc_plot_helper <- function(model, mcomp, component, dimlabels, two_d = FALSE,
 #' @param m_fac Multiplication factor to represent the confidence interval of
 #' the estimates. Defaults to 1.96.
 #' @inheritParams fpc_plot_helper
+#' @export
 covariate_plot_helper <- function(model, mcomp, dimlabels, int_include = TRUE,
                                   multi = TRUE, m_fac = 1.96) {
 
@@ -201,7 +203,7 @@ covariate_plot_helper <- function(model, mcomp, dimlabels, int_include = TRUE,
 
 #' Transform Covaraiate Effect Plot Data for 2D Case
 #'
-#' This is an internal function. It gives as an output the data set necessary to
+#' This function gives as an output the data set necessary to
 #' plot 2D trajectories of the effect plots.
 #'
 #' If a vector is supplied to covs, then the sum of the first elements up to the
@@ -217,6 +219,7 @@ covariate_plot_helper <- function(model, mcomp, dimlabels, int_include = TRUE,
 #'   axis (first for x, then for y axis). Defaults to labels ending with ".x"
 #'   and ".y".
 #' @inheritParams covariate_plot_helper
+#' @export
 covariate_plot_helper_2d_transform <- function(data, covs = 0L,
                                                indicator = c("\\.x", "\\.y"),
                                                m_fac = 1.96) {
@@ -284,10 +287,11 @@ covariate_plot_helper_2d_transform <- function(data, covs = 0L,
 
 #' Extract Data for Covariance Surface Plot
 #'
-#' This is an internal function. It gives as an output the data set necessary to
+#' This function gives as an output the data set necessary to
 #' plot the covariance surface. Probably not apt for more than two dimensions.
 #'
 #' @inheritParams fpc_plot_helper
+#' @export
 covariance_surf_plot_helper <- function(mcomp, component, dimlabels) {
 
   # Extract the matrix of Eigenfunctions
@@ -331,7 +335,7 @@ covariance_surf_plot_helper <- function(mcomp, component, dimlabels) {
 
 #' Create Data to Plot Covariate Effect Comparison Uni-Mul
 #'
-#' This is an internal function. It takes a data set of estimated covariate
+#' This function takes a data set of estimated covariate
 #' effects of a multivariate model and compares it to univariately estimated
 #' covariate effects.
 #'
@@ -340,6 +344,7 @@ covariance_surf_plot_helper <- function(mcomp, component, dimlabels) {
 #' @param epg_pr Predictions from second univariate model. Can be NULL.
 #' @param mul_level Effect level of the multivariate model to be plotted.
 #' @param uni_effect Number of the univariate effect to be plotted.
+#' @export
 covariate_comp_plot_helper <- function(dat_m, aco_pr, epg_pr, mul_level,
                                        uni_effect) {
 
@@ -394,7 +399,7 @@ covariate_comp_plot_helper <- function(dat_m, aco_pr, epg_pr, mul_level,
 
 #' Coverage Area Plot Helper Function
 #'
-#' This function is an internal function. The function takes one single effect
+#' This function takes one single effect
 #' function from the simulated effects and gives a data.frame which can be used
 #' to plot the coverage area of all simulation runs.
 #'
@@ -403,6 +408,7 @@ covariate_comp_plot_helper <- function(dat_m, aco_pr, epg_pr, mul_level,
 #' @param by Step size for the grid of y values to check for coverage.
 #'   Defaults to 1/99.
 #' @inheritParams create_coverage_array
+#' @export
 coverage_area_helper <- function(sim_curves, effect_index, ylim = c(-0.5, 0.5),
                                  by = 1/99, m_fac = 1.96){
 
