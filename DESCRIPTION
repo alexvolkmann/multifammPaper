@@ -1,7 +1,7 @@
 Package: multifammPaper
 Type: Package
 Title: Convenience Functions for the Analysis of the multiFAMM Paper
-Version: 0.1.0.9000
+Version: 0.1.0.9001
 Authors@R: person("Alexander", "Volkmann", 
     email = "alexander.volkmann@hu-berlin.de", role = c("aut", "cre"))
 Description: Convenience functions used in the analysis of the multiFAMM Paper 
