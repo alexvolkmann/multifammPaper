@@ -1016,9 +1016,7 @@ create_coverage_array <- function (sim_curves, gen_curves, effect_index,
   # Create upper and lower bounds of each simulation run
   # Extract original curve
   # Sum up functional and scalar intercept if necessary
-  if (effect_index == 1 ) {
-    warning(paste("Coverage is not implemented for the scalar intercept.",
-                  "Coverage is computed for functional intercept."))
+  if (effect_index %in% c(1, 2)) {
     sim_up <- lapply(sim_curves, function (it) {
       it$fit[[1]] + it$fit[[2]] + m_fac * (it$se.fit[[1]] + it$se.fit[[2]])
     })
@@ -1028,14 +1026,12 @@ create_coverage_array <- function (sim_curves, gen_curves, effect_index,
     gen <- gen_curves$fit[[1]] + gen_curves$fit[[2]]
   } else {
     sim_up <- lapply(sim_curves, function (it) {
-      it$fit[[1]] + it$fit[[effect_index]] +
-        m_fac * (it$se.fit[[1]] + it$se.fit[[effect_index]])
+      it$fit[[effect_index]] + m_fac * (it$se.fit[[effect_index]])
     })
     sim_do <- lapply(sim_curves, function (it) {
-      it$fit[[1]] + it$fit[[effect_index]] -
-        m_fac * (it$se.fit[[1]] + it$se.fit[[effect_index]])
+      it$fit[[effect_index]] - m_fac * (it$se.fit[[effect_index]])
     })
-    gen <- gen_curves$fit[[1]] + gen_curves$fit[[effect_index]]
+    gen <- gen_curves$fit[[effect_index]]
   }
 
   # Check if the original data is inside the simulated bounds
