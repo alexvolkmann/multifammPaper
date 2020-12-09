@@ -805,7 +805,7 @@ sim_eval_components <- function (folder, m_true_comp, label_cov,
 #' @inheritParams sim_eval_components
 #' @param uni_compare TRUE if the simulation scenario includes univariate model
 #'   estimates that should be also evaluated. Defaults to FALSE.
-#' @param export
+#' @export
 sim_eval_dimensions <- function (folder, m_true_comp, label_cov,
                                  relative = TRUE, uni_compare = FALSE,
                                  I = 9, J = 16, reps = 5, nested = FALSE) {
