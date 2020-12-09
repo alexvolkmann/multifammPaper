@@ -88,13 +88,13 @@ urrMSE <- function (fun_true, fun_estim, flip = FALSE, relative = TRUE) {
 
   if (relative) {
     lapply(seq_along(fun_true@.Data), function (x) {
-      sqrt(mean(norm(fun_true@.Data[[x]] - fun_estim@.Data[[x]])) /
-             mean(norm(fun_true@.Data[[x]])))
+      sqrt(mean(funData::norm(fun_true@.Data[[x]] - fun_estim@.Data[[x]])) /
+             mean(funData::norm(fun_true@.Data[[x]])))
     })
 
   } else {
     lapply(seq_along(fun_true@.Data), function (x) {
-      sqrt(mean(norm(fun_true@.Data[[x]] - fun_estim@.Data[[x]])))
+      sqrt(mean(funData::norm(fun_true@.Data[[x]] - fun_estim@.Data[[x]])))
     })
 
   }
