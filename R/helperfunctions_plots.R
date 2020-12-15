@@ -46,7 +46,8 @@ fpc_plot_helper <- function(model, mcomp, component, dimlabels, two_d = FALSE,
   } else {
 
     # model is given
-    meanfun <- predict_mean(model = model, multi = multi, dimnames = dimlabels)
+    meanfun <- multifamm:::predict_mean(model = model, multi = multi,
+                                        dimnames = dimlabels)
     meanfun <- funData2DataFrame(fundata = meanfun)
     phi <- funData2DataFrame(fundata =
                                            model$mfpc[[component]]$functions)
