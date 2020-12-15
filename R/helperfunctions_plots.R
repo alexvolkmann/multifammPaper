@@ -152,7 +152,7 @@ covariate_plot_helper <- function(model, mcomp, dimlabels, int_include = TRUE,
 
     # model is given
 
-    cov_preds <- predict_covs(model = model, method = "mul",
+    cov_preds <- multifamm:::predict_covs(model = model, method = "mul",
                                           type = "terms", unconditional = FALSE)
     data_list <- lapply(cov_preds, function (x) {
 
