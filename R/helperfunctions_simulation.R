@@ -83,7 +83,8 @@ gendata <- function(I = 10, J = 10, nested = FALSE, num_dim = 2,
                     interaction = FALSE, which_inter = matrix(NA),
                     model = NULL,
                     center_scores = FALSE, decor_scores = FALSE,
-                    nested_center = FALSE, trajectory = FALSE){
+                    nested_center = FALSE, trajectory = FALSE,
+                    equal_grid = FALSE){
 
   if(any(!requireNamespace("data.table") | !requireNamespace("funData"))){
     stop("Packages data.table and funData have to be installed.")
@@ -318,16 +319,23 @@ gendata <- function(I = 10, J = 10, nested = FALSE, num_dim = 2,
   locs <- list()
 
   # For each curve i = 1, ..., n on all the dimensions
-  if (!trajectory) {
-    for (i in 1:(n*num_dim)) {
-      locs[[i]] <- runif(n = number[i], min = min_grid, max = max_grid)
+  if (! equal_grid) {
+    if (!trajectory) {
+      for (i in 1:(n*num_dim)) {
+        locs[[i]] <- runif(n = number[i], min = min_grid, max = max_grid)
+      }
+    } else {
+      for (i in 1:n) {
+        locs[[i]] <- runif(n = number[i], min = min_grid, max = max_grid)
+      }
+      locs <- rep(locs, times = num_dim)
     }
   } else {
-    for (i in 1:n) {
-      locs[[i]] <- runif(n = number[i], min = min_grid, max = max_grid)
+    for (i in 1:(n*num_dim)) {
+      locs[[i]] <- seq(min_grid, max_grid, length.out = number[i])
     }
-    locs <- rep(locs, times = num_dim)
   }
+
 
 
   # Now bring time points in order before functions are constructed
@@ -1015,24 +1023,14 @@ create_coverage_array <- function (sim_curves, gen_curves, effect_index,
 
   # Create upper and lower bounds of each simulation run
   # Extract original curve
-  # Sum up functional and scalar intercept if necessary
-  if (effect_index %in% c(1, 2)) {
-    sim_up <- lapply(sim_curves, function (it) {
-      it$fit[[1]] + it$fit[[2]] + m_fac * (it$se.fit[[1]] + it$se.fit[[2]])
-    })
-    sim_do <- lapply(sim_curves, function (it) {
-      it$fit[[1]] + it$fit[[2]] - m_fac * (it$se.fit[[1]] + it$se.fit[[2]])
-    })
-    gen <- gen_curves$fit[[1]] + gen_curves$fit[[2]]
-  } else {
-    sim_up <- lapply(sim_curves, function (it) {
-      it$fit[[effect_index]] + m_fac * (it$se.fit[[effect_index]])
-    })
-    sim_do <- lapply(sim_curves, function (it) {
-      it$fit[[effect_index]] - m_fac * (it$se.fit[[effect_index]])
-    })
-    gen <- gen_curves$fit[[effect_index]]
-  }
+  # Evaluate functional and scalar intercepts separately
+  sim_up <- lapply(sim_curves, function (it) {
+    it$fit[[effect_index]] + m_fac * (it$se.fit[[effect_index]])
+  })
+  sim_do <- lapply(sim_curves, function (it) {
+    it$fit[[effect_index]] - m_fac * (it$se.fit[[effect_index]])
+  })
+  gen <- gen_curves$fit[[effect_index]]
 
   # Check if the original data is inside the simulated bounds
   coverage <- mapply(function (sim_up_it, sim_do_it) {
@@ -1087,7 +1085,7 @@ coverage_plot_helper <- function (cov_list, effect_index,
   dat <- do.call(rbind, prop_list)
   dat$effect <- factor(rep(seq_along(effect_index),
                            each = nrow(prop_list[[1]])),
-                       labels = paste0("f[", effect_index - 1, "](t)"))
+                       labels = paste0("f[", effect_index - 2, "](t)"))
   dat
 
 }
