@@ -4,7 +4,7 @@
 \alias{covariance_surf_plot_helper}
 \title{Extract Data for Covariance Surface Plot}
 \usage{
-covariance_surf_plot_helper(mcomp, component, dimlabels)
+covariance_surf_plot_helper(mcomp, component, dimlabels, corr = FALSE)
 }
 \arguments{
 \item{mcomp}{The extracted model components as given by the internal function
@@ -14,6 +14,9 @@ extract_components().}
 "E")}
 
 \item{dimlabels}{The dimensions of the model.}
+
+\item{corr}{TRUE if the correlation surface is to be estimated. Defaults to
+FALSE. Only implemented for two dimensions.}
 }
 \description{
 This function gives as an output the data set necessary to

@@ -12,7 +12,7 @@ gendata(I = 10, J = 10, nested = FALSE, num_dim = 2, lamB, lamC, lamE,
   min_visit = 3, max_visit = 3, use_RI = FALSE, covariate = TRUE,
   num_cov = 4, interaction = FALSE, which_inter = matrix(NA),
   model = NULL, center_scores = FALSE, decor_scores = FALSE,
-  nested_center = FALSE, trajectory = FALSE)
+  nested_center = FALSE, trajectory = FALSE, equal_grid = FALSE)
 }
 \arguments{
 \item{I}{Number of levels for first grouping variable (individuals).}

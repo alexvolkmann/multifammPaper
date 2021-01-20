@@ -292,8 +292,11 @@ covariate_plot_helper_2d_transform <- function(data, covs = 0L,
 #' plot the covariance surface. Probably not apt for more than two dimensions.
 #'
 #' @inheritParams fpc_plot_helper
+#' @param corr TRUE if the correlation surface is to be estimated. Defaults to
+#'  FALSE. Only implemented for two dimensions.
 #' @export
-covariance_surf_plot_helper <- function(mcomp, component, dimlabels) {
+covariance_surf_plot_helper <- function(mcomp, component, dimlabels,
+                                        corr = FALSE) {
 
   # Extract the matrix of Eigenfunctions
   mat <- do.call(rbind, lapply(mcomp$eigenfcts[[component]],
@@ -305,6 +308,14 @@ covariance_surf_plot_helper <- function(mcomp, component, dimlabels) {
 
   # Compute the Auto- and Cross-covariance
   cov_mat <- mat %*% dia %*% t(mat)
+
+  # Standardize if correlation surfaces are wanted
+  if (corr) {
+    var_x <- diag(cov_mat)[1:100]
+    var_y <- diag(cov_mat)[101:200]
+    std_mat <- sqrt(c(var_x, var_y) %*% t(c(var_x, var_y)))
+    cov_mat <- cov_mat / std_mat
+  }
 
   # Extract the grid on which the fPCs are computed
   grid <- unlist(mcomp$eigenfcts[[component]]@.Data[[1]]@argvals)
