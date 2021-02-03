@@ -570,6 +570,21 @@ sim_eval_components <- function (folder, m_true_comp, label_cov,
                                    function (x, true) {
 
     sigma_hat <- error_var$mul[[x]]$modelsig2 / error_var$mul[[x]]$modelweights
+    if (length(sigma_hat) != length(true)) {
+      max_w <- max(sigma_hat)
+      zero_var <- which(error_var$mul[[x]]$uni_vars == 0)
+      min_var <- which.min(error_var$mul[[x]]$uni_vars[-zero_var])
+      rest <- sigma_hat[-which.max(sigma_hat)]
+      sigma_hat <- vector(mode = "numeric", length = length(true))
+      sigma_hat[c(zero_var, min_var)] <- max_w
+      ind <- 1
+      for (i in seq_along(sigma_hat)) {
+        if (sigma_hat[i] == 0) {
+          sigma_hat[i] <- rest[ind]
+          ind <- ind + 1
+        }
+      }
+    }
     data.frame(it = rep(x, times = length(true_sig)),
                hat = sigma_hat,
                no = factor(seq_along(true_sig),
@@ -840,6 +855,21 @@ sim_eval_dimensions <- function (folder, m_true_comp, label_cov,
   dat_err_m <- do.call(rbind, lapply(seq_along(error_var$mul),
                                      function (x, true) {
      sigma_hat <- error_var$mul[[x]]$modelsig2 / error_var$mul[[x]]$modelweights
+     if (length(sigma_hat) != length(true)) {
+       max_w <- max(sigma_hat)
+       zero_var <- which(error_var$mul[[x]]$uni_vars == 0)
+       min_var <- which.min(error_var$mul[[x]]$uni_vars[-zero_var])
+       rest <- sigma_hat[-which.max(sigma_hat)]
+       sigma_hat <- vector(mode = "numeric", length = length(true))
+       sigma_hat[c(zero_var, min_var)] <- max_w
+       ind <- 1
+       for (i in seq_along(sigma_hat)) {
+         if (sigma_hat[i] == 0) {
+           sigma_hat[i] <- rest[ind]
+           ind <- ind + 1
+         }
+       }
+     }
      data.frame(it = rep(x, times = length(sigma_hat)),
                 hat = sigma_hat,
                 no = factor(1, labels = c("sigma^2")),
