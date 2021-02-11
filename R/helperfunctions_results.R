@@ -784,16 +784,14 @@ sim_eval_components <- function (folder, m_true_comp, label_cov,
   names <- label_cov
 
   dat_cov <- do.call(rbind, lapply(seq_along(cov_preds$mul), function (x) {
-    dat <- data.frame(it = x,
-                      no = factor(seq_along(cov_preds$mul[[x]]$fit),
-                                  labels = names),
-                      y = sapply(seq_along(cov_preds$mul[[x]]$fit),
-                                 function (y) {
-                        mrrMSE(fun_true = m_true_comp$cov_preds$fit[[y]],
-                               fun_estim = cov_preds$mul[[x]]$fit[[y]],
-                               relative = relative)
-                      }),
-                      comp = "Effectfunctions")
+    do.call(rbind, lapply(seq_along(cov_preds$mul[[x]]$fit), function (y) {
+      data.frame(it = x,
+                 no = factor(names[y]),
+                 y = mrrMSE(fun_true = m_true_comp$cov_preds$fit[[y]],
+                            fun_estim = cov_preds$mul[[x]]$fit[[y]],
+                            relative = relative),
+                 comp = "Effectfunctions")
+    }))
   }))
 
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
