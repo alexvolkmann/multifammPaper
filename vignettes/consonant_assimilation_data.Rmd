@@ -1,0 +1,502 @@
+---
+title: "consonant_assimilation_data"
+author: Alexander Volkmann
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{consonant_assimilation_data}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+```{r setup}
+library(data.table)
+library(funData)
+library(gridExtra)
+library(multifamm)
+library(multifammPaper)
+library(stargazer)
+library(tidyverse)
+library(viridis)
+data(phonetic)
+```
+
+# Analysis of the Consonant Assimilation Data
+
+This vignette provides the code to reproduce the analysis of the consonant assimilation data presented in the paper "Multivariate functional additive mixed models" (Volkmann et al., 2021). Note that this vignette does not execute the presented code because the required computing resources can be large.
+
+## Plot the Data
+
+```{r}
+RNGkind(sample.kind = "Rounding")
+set.seed(1234)
+chosen_0 <- sample(unique(subset(phonetic, covariate.1 == 0)$n_long),
+                   size = 3)
+chosen_1 <- sample(unique(subset(phonetic, covariate.1 == 1)$n_long),
+                   size = 3)
+
+# Prepare data for plotting
+dat <- copy(phonetic)
+dat$color <- factor(dat$n_long*(dat$n_long %in% c(chosen_0, chosen_1)),
+                    levels = c(0, chosen_0, chosen_1))
+setorder(dat, color)
+lev <- levels(as.factor(dat$n_long))
+lev <- c(lev[!(lev %in% c(chosen_0, chosen_1))], chosen_0, chosen_1)
+dat$n_long <- factor(dat$n_long, levels = lev)
+dat$cov.1 <- factor(dat$covariate.1, 
+                    labels = c("Curves for Order /s#sh/",
+                               "Curves for Order /sh#s/"))
+dat$dim <- factor(dat$dim, labels = c("ACO", "EPG"))
+dat$alpha <- ifelse(dat$dim == 0, 0.5, 1)
+
+# Plot the data
+ggplot2::ggplot(data = dat,
+                         aes(x = t, y = y_vec, group = factor(n_long), 
+                             colour = color, alpha = alpha)) +
+  geom_line(aes(size = color))+
+  facet_grid(dim ~ cov.1) +
+  scale_color_manual(values = c("grey75",
+                                "steelblue3", "dodgerblue4", "cadetblue",
+                                "firebrick3", "tomato2", "lightsalmon1")) +
+  scale_size_manual(values = c(0.3, 0.5,0.5,0.5,0.5,0.5,0.5)) +
+  theme_bw(base_size = 11) +
+  theme(legend.position = "none",
+        strip.text.x = element_text(size = 12)) +
+  ylab("Index Values (Y)") +
+  xlab("Normalized Time (t)") + 
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))
+```
+
+
+## Fitting the multiFAMM-Models
+
+We fit two multiFAMM-models: `m_mul` corresponds to the model presented in the main part and `m_wei` corresponds to the model of the sensitivity analysis in the appendix using a weighted scalar product. Additionally, we fit two univariate FAMM-models: `m_aco` and `m_epg`.
+
+```{r}
+# Multivariate Models
+m_mul <- multiFAMM(data = phonetic, fRI_B = TRUE, fRI_C = TRUE, bs = "ps",
+                   bf_mean = 8, bf_covariates = 8, m_mean = c(2, 3),
+                   covariate = TRUE, num_covariates = 4,
+                   covariate_form = c("by", "by", "by", "by"),
+                   interaction = TRUE,
+                   which_interaction = matrix(c(FALSE, TRUE, TRUE, TRUE,
+                                                TRUE,FALSE,FALSE,FALSE,
+                                                TRUE,FALSE,FALSE,FALSE,
+                                                TRUE,FALSE,FALSE,FALSE),
+                                              nrow = 4),
+                   bf_covs = c(5, 5, 5),
+                   m_covs = list(c(2, 3), c(2, 3), c(2, 3)), var_level = 1,
+                   use_famm = FALSE, save_model_famm = FALSE, one_dim = NULL,
+                   mfpc_cutoff = 0.95, number_mfpc = NULL,
+                   mfpc_cut_method = "total_var", final_method = "w_bam",
+                   mfpc_weight = FALSE)
+c_mul <- multifamm:::extract_components(m_mul, dim = c("aco", "epg"))
+
+m_wei <- multiFAMM(data = phonetic, fRI_B = TRUE, fRI_C = TRUE, bs = "ps",
+                   bf_mean = 8, bf_covariates = 8, m_mean = c(2,3),
+                   covariate = TRUE, num_covariates = 4,
+                   covariate_form = c("by", "by", "by", "by"),
+                   interaction = TRUE,
+                   which_interaction = matrix(c(FALSE, TRUE, TRUE, TRUE,
+                                                TRUE,FALSE,FALSE,FALSE,
+                                                TRUE,FALSE,FALSE,FALSE,
+                                                TRUE,FALSE,FALSE,FALSE),
+                                              nrow = 4),
+                   bf_covs = c(5, 5, 5),
+                   m_covs = list(c(2, 3), c(2, 3), c(2, 3)), var_level = 1,
+                   use_famm = FALSE, save_model_famm = FALSE, one_dim = NULL,
+                   mfpc_cutoff = 0.95, number_mfpc = NULL,
+                   mfpc_cut_method = "total_var", final_method = "w_bam",
+                   mfpc_weight = TRUE)
+c_wei <- multifamm:::extract_components(m_wei, dim = c("aco", "epg"))
+
+# Univariate Models
+m_aco <- multiFAMM(data = phonetic, fRI_B = TRUE, fRI_C = TRUE, bs = "ps",
+                   bf_mean = 8, bf_covariates = 8, m_mean = c(2, 3),
+                   covariate = TRUE, num_covariates = 4,
+                   covariate_form = c("by", "by", "by", "by"),
+                   interaction = TRUE,
+                   which_interaction = matrix(c(FALSE, TRUE, TRUE, TRUE,
+                                                TRUE,FALSE,FALSE,FALSE,
+                                                TRUE,FALSE,FALSE,FALSE,
+                                                TRUE,FALSE,FALSE,FALSE),
+                                              nrow = 4),
+                   bf_covs = c(5, 5, 5),
+                   m_covs = list(c(2, 3), c(2, 3), c(2, 3)), var_level = 0.95,
+                   use_famm = TRUE, save_model_famm = TRUE, one_dim = "aco",
+                   mfpc_cutoff = 0.95, number_mfpc = NULL,
+                   mfpc_cut_method = "total_var", final_method = "w_bam",
+                   mfpc_weight = FALSE)
+
+m_epg <- multiFAMM(data = phonetic, fRI_B = TRUE, fRI_C = TRUE, bs = "ps",
+                   bf_mean = 8, bf_covariates = 8, m_mean = c(2, 3),
+                   covariate = TRUE, num_covariates = 4,
+                   covariate_form = c("by", "by", "by", "by"),
+                   interaction = TRUE,
+                   which_interaction = matrix(c(FALSE, TRUE, TRUE, TRUE,
+                                                TRUE,FALSE,FALSE,FALSE,
+                                                TRUE,FALSE,FALSE,FALSE,
+                                                TRUE,FALSE,FALSE,FALSE),
+                                              nrow = 4),
+                   bf_covs = c(5, 5, 5),
+                   m_covs = list(c(2, 3), c(2, 3), c(2, 3)), var_level = 0.95,
+                   use_famm = TRUE, save_model_famm = TRUE, one_dim = "epg",
+                   mfpc_cutoff = 0.95, number_mfpc = NULL,
+                   mfpc_cut_method = "total_var", final_method = "w_bam",
+                   mfpc_weight = FALSE)
+```
+
+## Evaluation of Consonant Assimilation Data
+
+This code reproduces the plots of the appendix for the main model.
+
+```{r}
+# Table of eigenvalue decomposition ---------------------------------------
+
+# Calculate the untruncated MFPCA
+mfpca_info <- multifamm:::prepare_mfpca(model_list = m_mul$model_indep,
+                                        fRI_B = TRUE, mfpc_weight = FALSE)
+MFPC <- multifamm:::conduct_mfpca(mfpca_info, mfpc_weight = FALSE)
+
+# Extract eigenvalues
+eigenvals <- unlist(lapply(seq_along(MFPC), function (x) {
+  out <- MFPC[[x]]$values
+  names(out) <- paste0(names(MFPC)[x], 1:length(out))
+  out <- out[out>0]
+  out
+}))
+eigenvals <- eigenvals[order(names(eigenvals))]
+
+# Compute the univariate norms for weighting
+weights_aco <- unlist(sapply(seq_along(MFPC), function(comps){
+  out <- funData::norm(MFPC[[comps]]$functions$aco)
+  names(out) <- paste0(names(MFPC)[comps],
+                       seq_len(nObs(MFPC[[comps]]$functions)))
+  out <- na.omit(out)
+  out
+}))
+weights_aco <- weights_aco[order(names(weights_aco))]
+
+weights_epg <- unlist(sapply(seq_along(MFPC), function(comps){
+  out <- funData::norm(MFPC[[comps]]$functions$epg)
+  names(out) <- paste0(names(MFPC)[comps],
+                       seq_len(nObs(MFPC[[comps]]$functions)))
+  out <- na.omit(out)
+  out
+}))
+weights_epg <- weights_epg[order(names(weights_epg))]
+
+# Extract error variance
+error_var <- c_mul$error_var$uni_vars
+
+# Compute different total variances
+tot_var_mul <- sum(eigenvals, error_var)
+tot_var_aco <- c(eigenvals %*% weights_aco + error_var[1])
+tot_var_epg <- c(eigenvals %*% weights_epg + error_var[2])
+
+# Which components are in the model
+comps_in_m <- names(eigenvals) %in% unlist(
+  lapply(seq_along(c_mul$eigenvals), function(comp){
+    paste0(names(c_mul$eigenvals)[comp], 
+           seq_len(length(c_mul$eigenvals[[comp]])))
+}))
+
+# Create matrix for the table
+decomp <- matrix(
+  c(eigenvals[comps_in_m], error_var, tot_var_mul,
+    weights_aco[comps_in_m], NA, NA, NA,
+    weights_epg[comps_in_m], NA, NA, NA,
+    c((eigenvals*weights_aco)[comps_in_m], error_var[1])/tot_var_aco, NA, NA,
+    c((eigenvals*weights_epg)[comps_in_m], NA, error_var[2])/tot_var_epg, NA,
+    c(eigenvals[comps_in_m], error_var)/tot_var_mul, NA),
+  nrow = 6, byrow = TRUE)
+decomp[4:6, 11] <- rowSums(decomp[4:6,], na.rm = TRUE)
+
+# Combine both to a dataframe each
+vars <- c(eigenvals[comps_in_m], error_var)
+
+# Calculate and append proportion of variance explained
+props <- vars / tot_var_mul*100
+
+
+# Plot the FPCs ------------------------------------------------------------
+
+# Subject Component and rename the levels to that it is in the same line as
+# the snooker plots
+dat_B <- fpc_plot_helper(mcomp = c_mul, component = "B", 
+                         dimlabels = c("ACO", "EPG"), two_d = FALSE, m_fac = 2)
+levels(dat_B$effect) <- gsub("([0-9]+)]\\^B", "B\\1]", levels(dat_B$effect))
+levels(dat_B$effect) <- paste0(levels(dat_B$effect), ":~ ",
+                              round(props[grep("B", names(props))], 1), 
+                              "*'% Variation'")
+
+# Plot the data
+ggplot2::ggplot(data = dat_B, aes(x = t)) +
+  geom_line(aes(y = val), size = 0.2) +
+  geom_text(aes(y = val_p), label = "+", size = 1.5, col = "firebrick3") +
+  geom_text(aes(y = val_m), label = "-", size = 1.5, col = "dodgerblue4") +
+  geom_hline(yintercept = 0, linetype = "dotted", size = 0.2) +
+  facet_grid(dim ~ effect, labeller = label_parsed) +
+  xlab("Normalized Time (t)") +
+  ylab(expression("MFPC for Speaker (" ~ psi[B]^ ~ "(d)" ~ "(t) )")) +
+  theme_bw(base_size = 8) +
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))
+
+# Subject Component and rename the levels to that it is in the same line as
+# the snooker plots
+dat_E <- fpc_plot_helper(mcomp = c_mul, component = "E", 
+                         dimlabels = c("ACO", "EPG"), two_d = FALSE, m_fac = 2)
+levels(dat_E$effect) <- gsub("([0-9]+)]\\^E", "E\\1]", levels(dat_E$effect))
+levels(dat_E$effect) <- paste0(levels(dat_E$effect), ":~ ",
+                               round(props[grep("E", names(props))], 1), 
+                               "*'% Variation'")
+
+# Plot the data
+ggplot2::ggplot(data = dat_E, aes(x = t)) +
+  geom_line(aes(y = val), size = 0.2) +
+  geom_text(aes(y = val_p), label = "+", size = 1.5, col = "firebrick3") +
+  geom_text(aes(y = val_m), label = "-", size = 1.5, col = "dodgerblue4") +
+  geom_hline(yintercept = 0, linetype = "dotted", size = 0.2) +
+  facet_grid(dim ~ effect, labeller = label_parsed) +
+  xlab("Normalized Time (t)") +
+  ylab(expression("MFPC for Curve (" ~ psi[E]^ ~ "(d)" ~ "(t) )")) +
+  theme_bw(base_size = 8) +
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))
+
+# Plot the covariance surface of B
+cov_B <- covariance_surf_plot_helper(c_mul, "B", dimlabels = c("ACO", "EPG"))
+ggplot2::ggplot(data = cov_B, aes(x = col, y = row, z = value)) +
+  stat_contour(geom = "polygon", aes(fill = ..level..), na.rm = TRUE) +
+  geom_tile(aes(fill = value)) +
+  stat_contour(bins = 10, col = "black", na.rm = TRUE, size = 0.2) +
+  facet_grid(col_dim ~ row_dim) +
+  scale_fill_viridis(option = "D") +
+  labs(title = "Covariance for B",
+       x = NULL, y = NULL) +
+  theme_bw(base_size = 8) +
+  theme(plot.title = element_text(hjust = 0.5), 
+        legend.title = element_blank(),
+        legend.position = "bottom",
+        aspect.ratio = 1,
+        panel.spacing = unit(0.4, "lines")) +
+  scale_x_continuous(expand = c(0,0), 
+                     breaks = c(0, 0.25, 0.5, 0.75, 1),
+                     labels=c("0", "0.25", "0.5", "0.75", "1")) +
+  scale_y_continuous(expand = c(0,0), 
+                     breaks = c(0, 0.25, 0.5, 0.75, 1),
+                     labels=c("0", "0.25", "0.5", "0.75", "1")) +
+  guides(fill = guide_colorbar(barheight = 0.3))
+
+# Plot the covariance surface of E
+cov_E <- multifamm:::covariance_surf_plot_helper(c_mul, "E", 
+                                                 dimlabels = c("ACO", "EPG"))
+ggplot2::ggplot(data = cov_E, aes(x = col, y = row, z = value)) +
+  stat_contour(geom = "polygon", aes(fill = ..level..), na.rm = TRUE) +
+  geom_tile(aes(fill = value)) +
+  stat_contour(bins = 10, col = "black", na.rm = TRUE, size = 0.2) +
+  facet_grid(col_dim ~ row_dim) +
+  scale_fill_viridis(option = "D") +
+  labs(title = "Covariance Component E",
+       x = NULL, y = NULL) +
+  theme_bw(base_size = 8) +
+  theme(plot.title = element_text(hjust = 0.5), 
+        legend.title = element_blank(),
+        legend.position = "bottom",
+        aspect.ratio = 1,
+        panel.spacing = unit(0.4, "lines")) +
+  scale_x_continuous(expand = c(0,0), 
+                     breaks = c(0, 0.25, 0.5, 0.75, 1),
+                     labels=c("0", "0.25", "0.5", "0.75", "1")) +
+  scale_y_continuous(expand = c(0,0), 
+                     breaks = c(0, 0.25, 0.5, 0.75, 1),
+                     labels=c("0", "0.25", "0.5", "0.75", "1")) +
+  guides(fill = guide_colorbar(barheight = 0.3))
+
+
+# Plot the covariate effects ----------------------------------------------
+
+# Set up
+aco_pr <- multifamm:::predict_sparseFLMM_covar(m_aco)
+dat_n <- covariate_plot_helper(mcomp = c_mul, dimlabels = c("ACO", "EPG"))
+
+dat <- covariate_comp_plot_helper(dat_m = dat_n, aco_pr = aco_pr, epg_pr = NULL,
+                                  mul_level = c("f[1](t)"), uni_effect <- c(4))
+
+# Plot the covariate effects per order
+dat1 <- covariate_comp_plot_helper( 
+  dat_m = dat_n, aco_pr = aco_pr, epg_pr = NULL,
+  mul_level = c("f[0](t)", "f[2](t)", "f[3](t)", "f[4](t)"),
+  uni_effect <- c(1, 5, 6, 7))
+dat2 <-covariate_comp_plot_helper(
+  dat_m = dat_n, aco_pr = aco_pr, epg_pr = NULL,
+  mul_level = c("f[1](t)", "f[5](t)", "f[6](t)", "f[7](t)"),
+  uni_effect <- c(4, 8, 9, 10))
+
+
+ggplot2::ggplot(data = dat1, aes(x = t)) +
+  geom_line(aes(y = y), size = 0.25) +
+  geom_line(aes(y = y_p), linetype = "dashed", size = 0.25) +
+  geom_line(aes(y = y_m), linetype = "dashed", size = 0.25) +
+  geom_line(aes(y = y_uni), color = "firebrick3", size = 0.25) +
+  geom_line(aes(y = y_uni_p), color = "firebrick3", linetype = "dashed",
+            size = 0.25) +
+  geom_line(aes(y = y_uni_m), color = "firebrick3", linetype = "dashed",
+            size = 0.25) +
+  geom_hline(yintercept = 0, linetype = "dotted", size = 0.3) +
+  geom_rect(aes(ymin = min_val, ymax = max_val, xmin = x_start, xmax = x_end,
+                fill = se_dif), alpha = 0.15) +
+  facet_grid(dim ~ effect, labeller = label_parsed) +
+  xlab("Normalized Time (t)") +
+  ylab(expression("Effect Function (" ~ f^(d)~"(t) )")) +
+  theme_bw(base_size = 8)  +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c("firebrick3", NA)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))
+
+ggplot2::ggplot(data = dat2, aes(x = t)) +
+  geom_line(aes(y = y), size = 0.25) +
+  geom_line(aes(y = y_p), linetype = "dashed", size = 0.25) +
+  geom_line(aes(y = y_m), linetype = "dashed", size = 0.25) +
+  geom_line(aes(y = y_uni), color = "firebrick3", size = 0.25) +
+  geom_line(aes(y = y_uni_p), color = "firebrick3", linetype = "dashed",
+            size = 0.25) +
+  geom_line(aes(y = y_uni_m), color = "firebrick3", linetype = "dashed",
+            size = 0.25) +
+  geom_hline(yintercept = 0, linetype = "dotted", size = 0.3) +
+  geom_rect(aes(ymin = min_val, ymax = max_val, xmin = x_start, xmax = x_end,
+                fill = se_dif), alpha = 0.15) +
+  facet_grid(dim ~ effect, labeller = label_parsed) +
+  xlab("Normalized Time (t)") +
+  ylab(expression("Effect Function (" ~ f^(d)~"(t) )")) +
+  theme_bw(base_size = 8)  +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c("firebrick3", NA)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))
+```
+
+
+## Sensitivity Analysis
+
+```{r}
+# Table of eigenvalue decomposition ---------------------------------------
+
+# Calculate the untruncated MFPCA
+mfpca_info <- multifamm:::prepare_mfpca(model_list = m_wei$model_indep,
+                                        fRI_B = TRUE, mfpc_weight = FALSE)
+MFPC <- multifamm:::conduct_mfpca(mfpca_info, mfpc_weight = FALSE)
+
+# Extract error variance
+error_var <- c_wei$error_var$uni_vars
+
+# Extract eigenvalues
+eigenvals <- unlist(lapply(seq_along(MFPC), function (x) {
+  out <- MFPC[[x]]$values
+  names(out) <- paste0(names(MFPC)[x], 1:length(out))
+  out <- out[out>0]
+  out
+}))
+eigenvals <- eigenvals[order(names(eigenvals))]
+
+# Compute the univariate norms for weighting
+weights_aco <- unlist(sapply(seq_along(MFPC), function(comps){
+  out <- funData::norm(MFPC[[comps]]$functions$aco) 
+  names(out) <- paste0(names(MFPC)[comps],
+                       seq_len(nObs(MFPC[[comps]]$functions)))
+  out <- na.omit(out)
+  out
+}))
+weights_aco <- weights_aco[order(names(weights_aco))]
+
+weights_epg <- unlist(sapply(seq_along(MFPC), function(comps){
+  out <- funData::norm(MFPC[[comps]]$functions$epg)
+  names(out) <- paste0(names(MFPC)[comps],
+                       seq_len(nObs(MFPC[[comps]]$functions)))
+  out <- na.omit(out)
+  out
+}))
+weights_epg <- weights_epg[order(names(weights_epg))]
+
+# Compute different total variances
+tot_var_mul <- sum(eigenvals, length(error_var))
+tot_var_aco <- c(eigenvals %*% weights_aco + error_var[1])
+tot_var_epg <- c(eigenvals %*% weights_epg + error_var[2])
+
+# Which components are in the model
+comps_in_m <- names(eigenvals) %in% unlist(
+  lapply(seq_along(c_wei$eigenvals), function(comp){
+    paste0(names(c_wei$eigenvals)[comp], 
+           seq_len(length(c_wei$eigenvals[[comp]])))
+  }))
+
+# Create matrix for the table
+decomp <- matrix(
+  c(eigenvals[comps_in_m], error_var, tot_var_mul,
+    weights_aco[comps_in_m]*1/error_var[1], NA, NA, NA,
+    weights_epg[comps_in_m]*1/error_var[2], NA, NA, NA,
+    c((eigenvals*weights_aco)[comps_in_m], error_var[1])/tot_var_aco, NA, NA,
+    c((eigenvals*weights_epg)[comps_in_m], NA, error_var[2])/tot_var_epg, NA,
+    c(eigenvals[comps_in_m], rep(1, length(error_var)))/tot_var_mul, NA),
+  nrow = 6, byrow = TRUE)
+decomp[4:6, 11] <- rowSums(decomp[4:6,], na.rm = TRUE)
+
+props <- eigenvals[comps_in_m]/tot_var_mul*100
+
+
+# Plot the FPCs to be included in the Paper -------------------------------
+
+# Subject Component and rename the levels to that it is in the same line as
+# the snooker plots
+dat_B <- fpc_plot_helper(mcomp = c_wei, component = "B", 
+                         dimlabels = c("ACO", "EPG"), two_d = FALSE,
+                         m_fac = 2)
+levels(dat_B$effect) <- gsub("([0-9]+)]\\^B", "B\\1]", levels(dat_B$effect))
+levels(dat_B$effect) <- paste0(levels(dat_B$effect), ":~ ",
+                               round(props[grep("B", names(props))], 1), 
+                               "*'% Variation'")
+
+# Plot the data
+ggplot2::ggplot(data = dat_B, aes(x = t)) +
+  geom_line(aes(y = val), size = 0.2) +
+  geom_text(aes(y = val_p), label = "+", size = 1.5, col = "firebrick3") +
+  geom_text(aes(y = val_m), label = "-", size = 1.5, col = "dodgerblue4") +
+  geom_hline(yintercept = 0, linetype = "dotted", size = 0.2) +
+  facet_grid(dim ~ effect, labeller = label_parsed) +
+  xlab("Normalized Time (t)") +
+  ylab(expression("MFPC for Speaker (" ~ psi[B]^ ~ "(d)" ~ "(t) )")) +
+  theme_bw(base_size = 8) +
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))
+
+# Subject Component and rename the levels to that it is in the same line as
+# the snooker plots
+dat_E <- fpc_plot_helper(mcomp = c_wei, component = "E", 
+                         dimlabels = c("ACO", "EPG"), two_d = FALSE,
+                         m_fac = 2)
+levels(dat_E$effect) <- gsub("([0-9]+)]\\^E", "E\\1]", levels(dat_E$effect))
+levels(dat_E$effect) <- paste0(levels(dat_E$effect), ":~ ",
+                               round(props[grep("E", names(props))], 1), 
+                               "*'% Variation'")
+
+# Plot the data
+ggplot2::ggplot(data = dat_E, aes(x = t)) +
+  geom_line(aes(y = val), size = 0.2) +
+  geom_text(aes(y = val_p), label = "+", size = 1.5, col = "firebrick3") +
+  geom_text(aes(y = val_m), label = "-", size = 1.5, col = "dodgerblue4") +
+  geom_hline(yintercept = 0, linetype = "dotted", size = 0.2) +
+  facet_grid(dim ~ effect, labeller = label_parsed) +
+  xlab("Normalized Time (t)") +
+  ylab(expression("MFPC for Curve (" ~ psi[E]^ ~ "(d)" ~ "(t) )")) +
+  theme_bw(base_size = 8) +
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))
+
+```
+
+

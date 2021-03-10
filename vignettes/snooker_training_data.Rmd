@@ -1,0 +1,571 @@
+---
+title: "snooker_training_data"
+author: Alexander Volkmann
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Snooker Training Data}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+```{r setup}
+library(data.table)
+library(funData)
+library(grid)
+library(gridExtra)
+library(multifamm)
+library(multifammPaper)
+library(sparseFLMM)
+library(tidyverse)
+library(viridis)
+data("snooker")
+```
+
+# Analysis of the Snooker Training Data
+
+This vignette provides the code to reproduce the analysis of the snooker training data presented in the paper "Multivariate functional additive mixed models" (Volkmann et al., 2021). Note that this vignette does not execute the presented code because the required computing resources can be large.
+
+## Plot the Data
+
+```{r}
+# Multivariate Observation Plot -------------------------------------------
+
+# Choose random individuals
+set.seed(123)
+chosen_0 <- sample(unique(subset(snooker, covariate.1 == 0)$n_long), size = 3)
+chosen_1 <- sample(unique(subset(snooker, covariate.1 == 1)$n_long), size = 3)
+
+# Prepare data for plotting
+snooker$color <- factor(snooker$n_long*(snooker$n_long %in% 
+                                          c(chosen_0, chosen_1)),
+                    levels = c(0, chosen_0, chosen_1))
+helpdat <- data.frame(
+  do.call(rbind, strsplit(as.character(snooker$dim), ".", fixed = TRUE)))
+names(helpdat) <- c("location", "axis")
+snooker <- cbind(snooker, helpdat)
+snooker <- snooker %>%
+  unite(curve_group, n_long, location) %>%
+  select(-dim) %>%
+  spread(axis, y_vec)
+lev <- levels(as.factor(snooker$curve_group))
+combined_lev <- grepl(paste(c(chosen_0, chosen_1), collapse = "|"), lev)
+lev <- c(lev[!combined_lev], lev[combined_lev])
+snooker$curve_group <- factor(snooker$curve_group, levels = lev)
+snooker$cov.1 <- factor(snooker$covariate.1, 
+                    labels = c("Shots of Unskilled Players",
+                               "Shots of Skilled Players"))
+
+# Create data with starts of trajectories
+beg <- snooker %>%
+  group_by(curve_group) %>%
+  filter(color != "0") %>%
+  slice(which.min(t)) %>%
+  ungroup()
+
+ggplot2::ggplot() +
+  geom_path(data = snooker, aes(x = x, y = y, group = curve_group, 
+                                colour = color, size = color), alpha = 0.5) +
+  facet_grid(cols = vars(cov.1)) +
+  scale_color_manual(values = c("grey75",
+                                "steelblue3", "dodgerblue4", "cadetblue",
+                                "firebrick3", "tomato2", "lightsalmon1")) +
+  scale_size_manual(values =  c(0.3, 0.5,0.5,0.5,0.5,0.5,0.5)) +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "none",
+        strip.text.x = element_text(size = 14)) +
+  ylab("Y") +
+  xlab("X") +
+  geom_point(data = beg, aes(x = x, y = y),
+             shape = 8, size = 0.8, colour = "black", alpha = 0.5)
+
+
+# Univariate Observation Plot ---------------------------------------------
+
+snooker$location <- as.factor(sapply(strsplit(as.character(snooker$dim),
+                                              split = "\\."), "[[", 1))
+snooker$axis <- as.factor(sapply(strsplit(as.character(snooker$dim),
+                                          split = "\\."), "[[", 2))
+snooker$cov.1 <- factor(snooker$covariate.1, 
+                        labels = c("Shots of Unskilled Players",
+                                   "Shots of Skilled Players"))
+ggplot2::ggplot(data = snooker,
+                aes(x = t, y = y_vec, group = n_long)) + 
+  geom_line(alpha = 0.1) +
+  facet_wrap(axis ~ location, scales = "free") +
+  scale_size_manual(values =  0.3) + 
+  theme_bw(base_size = 8) +
+  theme(legend.position = "none") +
+  xlab("Standardized Time (t)") +
+  ylab("Value") + 
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))
+```
+
+
+## Fitting the multiFAMM-Models
+
+We fit two multiFAMM-models: `m` corresponds to the model presented in the main part and `m_sens` corresponds to the model of the sensitivity analysis in the appendix.
+```{r}
+m <- multiFAMM(data = snooker, 
+               fRI_B = TRUE, fRI_C = TRUE, nested = TRUE,
+               bs = "ps", bf_mean = 8, bf_covariates = 8, m_mean = c(2, 1), 
+               covariate = TRUE, num_covariates = 4, 
+               covariate_form = rep("by", times = 4),
+               interaction = FALSE, 
+               bf_covs = c(5, 5, 5),
+               m_covs = list(c(2, 1), c(2, 1), c(2, 1)), var_level = 1,
+               use_famm = FALSE, save_model_famm = FALSE, one_dim = NULL, 
+               mfpc_weight = FALSE, mfpc_cutoff = 0.95, number_mfpc = NULL, 
+               mfpc_cut_method = "total_var", final_method = "bam")
+
+m_sens <- multiFAMM(data = snooker, 
+                    fRI_B = TRUE, fRI_C = TRUE, nested = TRUE,
+                    bs = "ps", bf_mean = 8, bf_covariates = 8, m_mean = c(2, 1), 
+                    covariate = TRUE, num_covariates = 4, 
+                    covariate_form = rep("by", times = 4),
+                    interaction = FALSE, 
+                    bf_covs = c(5, 5, 5),
+                    m_covs = list(c(2, 1), c(2, 1), c(2, 1)), var_level = 1,
+                    use_famm = FALSE, save_model_famm = FALSE, one_dim = NULL, 
+                    mfpc_weight = FALSE, mfpc_cutoff = 0.99, number_mfpc = NULL, 
+                    mfpc_cut_method = "total_var", final_method = "w_bam")
+```
+
+## Evaluation of Snooker Data
+
+This code reproduces the plots of the main part and the appendix.
+```{r}
+# Set up ------------------------------------------------------------------
+dimlabels <- names(m$model_indep)
+dat_n <- covariate_plot_helper(model = m2, dimlabels = dimlabels)
+
+
+# Table of eigenvalue decomposition ---------------------------------------
+
+# Extract eigenvalues
+eigenvals <- lapply(seq_along(m$mfpc), function (x) {
+  out <- m$mfpc[[x]]$values
+  names(out) <- paste0(names(m$mfpc)[x], 1:length(out))
+  out
+})
+
+# Extract error variance
+error_var <- lapply(seq_along(m$model_indep), function (x) {
+  out <- m$model_indep[[x]]$cov_hat_tri_constr$sigmasq
+  names(out) <- paste0("Sigma2", names(m$model_indep)[[x]])
+  out
+})
+
+# Calculate proportion of variance explained
+mfpca_info <- multifamm:::prepare_mfpca(model_list = m2$model_indep,
+                                        fRI_B = TRUE, mfpc_weight = FALSE)
+MFPC <- multifamm:::conduct_mfpca(mfpca_info, mfpc_weight = FALSE)
+tot_var <- sum(unlist(lapply(MFPC, "[[", "values")), unlist(error_var))
+props <- vars/tot_var*100
+
+
+# Plot all the different FPCs ---------------------------------------------
+
+# Loop over all possible plots
+for (u in c("B", "C", "E")) {
+  dat <- fpc_plot_helper(model = m, component = u, dimlabels = dimlabels,
+                         two_d = TRUE, m_fac = 2)
+  beg <- dat %>%
+    group_by(effect) %>%
+    filter(t == min(t))
+  
+  for (i in levels(dat$effect)) {
+    j <- which(levels(dat$effect) == i)
+    perc_exp <- round(props[paste0(u, j)], 1)
+    p <- ggplot2::ggplot(data = dat %>% filter(effect == i),
+                         aes(group = location)) +
+      geom_path(aes(x = x_val, y = y_val), size = 0.5) +
+      geom_text(aes(x = x_val_p, y = y_val_p), label = "+", size = 2,
+                col = "firebrick3") +
+      geom_text(aes(x = x_val_m, y = y_val_m), label = "-", size = 2,
+                col = "dodgerblue4") +
+      geom_point(data = beg %>% filter(effect == i),
+                 aes(x = x_val, y = y_val),
+                 shape = 8, size = 0.8, colour = "black", alpha = 0.5) +
+      geom_point(data = beg %>% filter(effect == i),
+                 aes(x = x_val_m, y = y_val_m),
+                 shape = 8, size = 0.8, colour = "dodgerblue4", alpha = 0.5) +
+      geom_point(data = beg %>% filter(effect == i),
+                 aes(x = x_val_p, y = y_val_p),
+                 shape = 8, size = 0.8, colour = "firebrick3", alpha = 0.5) +
+      
+      xlab("X") +
+      ylab("Y") +
+      ggtitle(bquote(psi[.(u)*.(j)](t):~.(perc_exp)*"% Variation")) +
+      theme_bw(base_size = 8)
+    assign(paste0("p_", u, "_", j), p)
+  }
+}
+
+
+# Plots for all fixed covariate effects -----------------------------------
+
+# All the combinations without the intercept
+plot_covs <- list(c(0, 1), c(0, 2), c(0, 3), c(0, 2, 3, 4))
+
+for (i in plot_covs) {
+  dat_s <- covariate_plot_helper_2d_transform(data = dat_n, covs = i)
+  beg_s <- dat_s %>%
+    group_by(dim) %>%
+    filter(t == min(t))
+  
+  # Plot the trajectory data
+  p1 <- ggplot2::ggplot(data = dat_s) +
+    geom_path(aes(x = val_x, y = val_y, group = dim), size = 0.5, 
+              col = "dodgerblue4") +
+    geom_path(aes(x = val_x_int, y = val_y_int, group = dim),
+              col = "firebrick3", size = 0.5) +
+    geom_point(data = beg_s,
+               aes(x = val_x, y = val_y),
+               shape = 8, size = 0.8, colour = "dodgerblue4", alpha = 0.5) +
+    geom_point(data = beg_s,
+               aes(x = val_x_int, y = val_y_int),
+               shape = 8, size = 0.8, colour = "firebrick3", alpha = 0.5) +
+    xlab("X") +
+    ylab("Y") +
+    theme_bw(base_size = 8) 
+  
+  # Plot the vertical univariate effects
+  p2 <- ggplot2::ggplot(data = dat_n %>% 
+                          filter(dim %in% c("elbow.y", "hand.y", "shoulder.y"),
+                                 cov == i[length(i)]),
+                        aes(x = t)) +
+    geom_line(aes(y = y), size = 0.25) +
+    geom_line(aes(y = y_p), linetype = "dotted", size = 0.25) +
+    geom_line(aes(y = y_m), linetype = "dotted", size = 0.25) +
+    geom_hline(yintercept = 0, size = 0.2, linetype = "longdash",
+               col = "dodgerblue4") +
+    facet_grid(rows = vars(dim), scales = "free") +
+    xlab("Standardized Time (t)") +
+    ylab(NULL) +
+    theme_grey(base_size = 8) +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.border = element_rect(fill = NA),
+          panel.background = element_rect(fill = NA),
+          text = element_text(size = 5),
+          strip.text.y = element_text(size = 7)) +
+    scale_x_continuous(breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1"))
+  
+  # Plot the horizontal univariate effects
+  p3 <- ggplot2::ggplot(data = dat_n %>% 
+                          filter(dim %in% c("elbow.x", "hand.x", "shoulder.x"), 
+                                 cov == i[length(i)]),
+                        aes(x = t)) +
+    geom_line(aes(y = y), size = 0.25) +
+    geom_line(aes(y = y_p), linetype = "dotted", size = 0.25) +
+    geom_line(aes(y = y_m), linetype = "dotted", size = 0.25) +
+    geom_hline(yintercept = 0, size = 0.2, linetype = "longdash",
+               col = "dodgerblue4") +
+    facet_grid(cols = vars(dim), scales = "free") +
+    xlab("Standardized Time (t)") +
+    ylab(NULL) +
+    theme_grey(base_size = 8) +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.border = element_rect(fill = NA),
+          panel.background = element_rect(fill = NA),
+          text = element_text(size = 5),
+          strip.text.x = element_text(size = 7)) +
+    scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))
+
+  # Combine the plots
+  if(length(i) == 4) {
+    title <- "f[0]+f[2]+f[3]~(+f[4])"
+  } else {
+    title <- paste0("f[0]~(+f[", i[length(i)], "])")
+  }
+  
+  g <- grid.arrange(p1, p2, p3, layout_matrix = rbind(c(1, 1, 1, 2),
+                                                      c(1, 1, 1, 2),
+                                                      c(1, 1, 1, 2), 
+                                                      c(3, 3, 3, 4)),
+                    top = grid.text(parse(text = title)))
+  assign(paste("g", paste(i, collapse = "_"), sep = "_"), g)
+  
+}
+
+
+# Plot the intercept ------------------------------------------------------
+
+dat_s <- covariate_plot_helper_2d_transform(data = dat_n, covs = 0)
+beg_s <- dat_s %>%
+  group_by(dim) %>%
+  filter(t == min(t))
+
+# Plot the data
+p1 <- ggplot2::ggplot(data = dat_s) +
+  geom_path(aes(x = val_x, y = val_y, group = dim), size = 0.5, 
+            col = "dodgerblue4") +
+  geom_point(data = beg_s,
+             aes(x = val_x, y = val_y),
+             shape = 8, size = 0.8, colour = "dodgerblue4", alpha = 0.5) +
+  xlab("X") +
+  ylab("Y") +
+  theme_bw(base_size = 8) 
+
+p2 <- ggplot2::ggplot(data = dat_n %>% 
+                        filter(dim %in% c("elbow.y", "hand.y", "shoulder.y"),
+                               cov == 0),
+                      aes(x = t)) +
+  geom_line(aes(y = y), size = 0.25) +
+  geom_line(aes(y = y_p), linetype = "dotted", size = 0.25) +
+  geom_line(aes(y = y_m), linetype = "dotted", size = 0.25) +
+  geom_hline(yintercept = 0, size = 0.2, linetype = "longdash",
+             col = "grey60") +
+  facet_grid(rows = vars(dim), scales = "free") +
+  xlab("Standardized Time (t)") +
+  ylab(NULL) +
+  theme_grey(base_size = 8) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(fill = NA),
+        panel.background = element_rect(fill = NA),
+        text = element_text(size = 5),
+        strip.text.y = element_text(size = 7)) +
+  scale_x_continuous(breaks = c(0, 0.5, 1), labels = c("0", "0.5", "1"))
+
+p3 <- ggplot2::ggplot(data = dat_n %>% 
+                        filter(dim %in% c("elbow.x", "hand.x", "shoulder.x"), 
+                               cov == 0),
+                      aes(x = t)) +
+  geom_line(aes(y = y), size = 0.25) +
+  geom_line(aes(y = y_p), linetype = "dotted", size = 0.25) +
+  geom_line(aes(y = y_m), linetype = "dotted", size = 0.25) +
+  geom_hline(yintercept = 0, size = 0.2, linetype = "longdash",
+             col = "grey60") +
+  facet_grid(cols = vars(dim), scales = "free") +
+  xlab("Standardized Time (t)") +
+  ylab(NULL) +
+  theme_grey(base_size = 8) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(fill = NA),
+        panel.background = element_rect(fill = NA),
+        text = element_text(size = 5),
+        strip.text.x = element_text(size = 7)) +
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))
+
+g <- grid.arrange(p1, p2, p3, layout_matrix = rbind(c(1, 1, 1, 2),
+                                               c(1, 1, 1, 2),
+                                               c(1, 1, 1, 2), 
+                                               c(3, 3, 3, 4)),
+                  top = grid.text(expression(f[0])))
+
+```
+
+
+## Sensitivity Analysis
+
+```{r}
+# Model Fit ---------------------------------------------------------------
+
+# MultiFunData for Fit and Y values
+# For main model
+y_val <- lapply(split(m$data, m$data$dim), function(x) {
+  uhu <- split(x, x$n_long)
+  irregFunData(argvals = lapply(uhu, "[[", "t"),
+                          X = lapply(uhu, "[[", "y_vec"))
+})
+y_fit <- lapply(split(cbind(m$data, fit = m$model$fitted.values),
+                                   m$data$dim), function(x) {
+  uhu <- split(x, x$n_long)
+  irregFunData(argvals = lapply(uhu, "[[", "t"),
+                          X = lapply(uhu, "[[", "fit"))
+})
+rel <- urrMSE(fun_true = y_val, fun_estim = y_fit, flip = FALSE, 
+              relative = TRUE)
+
+
+# Calculate the mrrMSE Contributions --------------------------------------
+
+# Transform the list of irregFunDatas to a list of multiFunDatas per observation
+dif <- mapply(function (val, fit) val - fit, val = y_val, fit = y_fit,
+              SIMPLIFY = FALSE)
+mul_norm <- unlist(lapply(seq_len(nObs(dif[[1]])), function (obs) {
+  do.call(sum, lapply(dif, function (dim) {
+    norm(extractObs(dim, obs), squared = TRUE, fullDom = TRUE)
+  }))
+}))
+names(mul_norm) <- names(y_val$elbow.x)
+
+# Extract the quantiles according to the mrrMSE
+sel <- sapply(quantile(mul_norm, probs = c(0, 0.25, 0.5, 0.75, 1), 
+                       type = 3), 
+              function(x) {names(which(mul_norm == x))})
+names(sel)[c(1, length(sel))] <- c("Min", "Max")
+
+
+# Plot Observations vs Fitted Trajectories --------------------------------
+
+pl <- plot_snooker_fit(obs = sel, model = m, model_comp = m_sens)
+
+
+# Contribution of Fixed Effects -------------------------------------------
+
+mat <- predict(m$model, type = "terms")
+pred_var <- do.call(rbind, lapply(levels(m$data$dim), function (dim) {
+  dat <- split(as.data.frame(mat), m$data$dim)[[dim]]
+  vars <- sapply(dat, var)
+  vars <- vars[vars > 0]
+  rat <- vars / sum(vars)
+}))
+
+
+# Residual Analysis -------------------------------------------------------
+
+dat <- cbind(m$data, resid = m$model$residuals, 
+             resid4 = m_sens$model$residuals) %>%
+  mutate(location = as.factor(sapply(strsplit(as.character(snooker$dim), 
+                                              split = "\\."), "[[", 1)),
+         axis = as.factor(sapply(strsplit(as.character(snooker$dim),
+                                           split = "\\."), "[[", 2)))
+p1 <- ggplot(data = dat, aes(x = t, y = resid)) +
+  geom_point(alpha = 0.2, size = 0.5) +
+  facet_wrap(axis ~ location) +
+  xlab("Standardized Time (t)") + 
+  theme_bw(base_size = 8) +
+  ylab("Residuals") + 
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))+
+  ggtitle("Residuals of Model Fit")
+p2 <- ggplot(data = dat, aes(x = t, y = resid4)) +
+  geom_point(alpha = 0.2, size = 0.5) +
+  facet_wrap(axis ~ location) +
+  xlab("Standardized Time (t)") + 
+  theme_bw(base_size = 8) +
+  ylab("Residuals") + 
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1")) +
+  ylim(range(dat$resid))+
+  ggtitle("Residuals of Sensitivity Analysis")
+
+
+# Check for Autocorrelation -----------------------------------------------
+# Create data for covariance estimation
+dat_y <- data.table(
+  y_vec = m$data$y_vec,
+  t = m$data$t,
+  n_long = as.integer(as.character(m$data$n_long)),
+  subject_long = as.integer(as.character(m$data$subject_long)),
+  dim = m$data$dim
+)
+dat_r <- data.table(
+  y_vec = m$model$residuals,
+  t = m$data$t,
+  n_long = as.integer(as.character(m$data$n_long)),
+  subject_long = as.integer(as.character(m$data$subject_long)),
+  dim = m$data$dim
+)
+dat_r4 <- data.table(
+  y_vec = m_sens$model$residuals,
+  t = m_sens$data$t,
+  n_long = as.integer(as.character(m_sens$data$n_long)),
+  subject_long = as.integer(as.character(m_sens$data$subject_long)),
+  dim = m_sens$data$dim
+)
+
+# Covariance estimation
+cov_y <- estim_overall_cov(data = dat_y)
+cov_r <- estim_overall_cov(data = dat_r)
+cov_r4 <- estim_overall_cov(data = dat_r4)
+
+# Focus on the locations of interest
+cov_y_el <- list(eigenfcts = list(E = multiFunData(cov_y$E$functions$elbow.x,
+                                                    cov_y$E$functions$elbow.y)),
+                 eigenvals = list(E = cov_y$E$values))
+cov_y_ha <- list(eigenfcts = list(E = multiFunData(cov_y$E$functions$hand.x,
+                                                    cov_y$E$functions$hand.y)),
+                 eigenvals = list(E = cov_y$E$values))
+cov_y_sh <- list(eigenfcts = list(E = multiFunData(cov_y$E$functions$shoulder.x,
+                                                 cov_y$E$functions$shoulder.y)),
+                 eigenvals = list(E = cov_y$E$values))
+cov_r_el <- list(eigenfcts = list(E = multiFunData(cov_r$E$functions$elbow.x,
+                                                   cov_r$E$functions$elbow.y)),
+                 eigenvals = list(E = cov_r$E$values))
+cov_r_ha <- list(eigenfcts = list(E = multiFunData(cov_r$E$functions$hand.x,
+                                                   cov_r$E$functions$hand.y)),
+                 eigenvals = list(E = cov_r$E$values))
+cov_r_sh <- list(eigenfcts = list(E = multiFunData(cov_r$E$functions$shoulder.x,
+                                                 cov_r$E$functions$shoulder.y)),
+                 eigenvals = list(E = cov_r$E$values))
+cov_r4_el <- list(eigenfcts = list(E = multiFunData(cov_r4$E$functions$elbow.x,
+                                                  cov_r4$E$functions$elbow.y)),
+                 eigenvals = list(E = cov_r4$E$values))
+cov_r4_ha <- list(eigenfcts = list(E = multiFunData(cov_r4$E$functions$hand.x,
+                                                   cov_r4$E$functions$hand.y)),
+                 eigenvals = list(E = cov_r4$E$values))
+cov_r4_sh <- list(eigenfcts = list(
+                              E = multiFunData(cov_r4$E$functions$shoulder.x,
+                                               cov_r4$E$functions$shoulder.y)),
+                 eigenvals = list(E = cov_r4$E$values))
+
+# Data of the correlation surfaces
+cov_y_surf_el <- covariance_surf_plot_helper(cov_y_el, "E", corr = TRUE, 
+                                             dimlabels = c("elbow.x", 
+                                                           "elbow.y"))
+cov_y_surf_ha <- covariance_surf_plot_helper(cov_y_ha, "E", corr = TRUE, 
+                                             dimlabels = c("hand.x", "hand.y"))
+cov_y_surf_sh <- covariance_surf_plot_helper(cov_y_sh, "E", corr = TRUE,
+                                             dimlabels = c("shoulder.x", 
+                                                           "shoulder.y"))
+cov_r_surf_el <- covariance_surf_plot_helper(cov_r_el, "E", corr = TRUE, 
+                                             dimlabels = c("elbow.x", 
+                                                           "elbow.y"))
+cov_r_surf_ha <- covariance_surf_plot_helper(cov_r_ha, "E", corr = TRUE, 
+                                             dimlabels = c("hand.x", "hand.y"))
+cov_r_surf_sh <- covariance_surf_plot_helper(cov_r_sh, "E", corr = TRUE,
+                                             dimlabels = c("shoulder.x", 
+                                                           "shoulder.y"))
+cov_r4_surf_el <- covariance_surf_plot_helper(cov_r4_el, "E", corr = TRUE, 
+                                              dimlabels = c("elbow.x", 
+                                                            "elbow.y"))
+cov_r4_surf_ha <- covariance_surf_plot_helper(cov_r4_ha, "E", corr = TRUE, 
+                                              dimlabels = c("hand.x", "hand.y"))
+cov_r4_surf_sh <- covariance_surf_plot_helper(cov_r4_sh, "E", corr = TRUE,
+                                              dimlabels = c("shoulder.x", 
+                                                            "shoulder.y"))
+
+# Approximate the autocorrelation function
+dat_y <- rbind(approx_autocor(cov_y_surf_el), approx_autocor(cov_y_surf_ha),
+               approx_autocor(cov_y_surf_sh)) %>%
+  mutate(source = factor("Y"))
+dat_r <- rbind(approx_autocor(cov_r_surf_el), approx_autocor(cov_r_surf_ha),
+               approx_autocor(cov_r_surf_sh)) %>%
+  mutate(source = factor("r (m2)"))
+dat_r4 <- rbind(approx_autocor(cov_r4_surf_el), approx_autocor(cov_r4_surf_ha),
+               approx_autocor(cov_r4_surf_sh)) %>%
+  mutate(source = factor("r (m4)"))
+dat <- rbind(dat_y, dat_r, dat_r4) %>%
+  mutate(location = as.factor(sapply(strsplit(as.character(dim), 
+                                              split = "\\."), "[[", 1)),
+              axis = as.factor(sapply(strsplit(as.character(dim),
+                                               split = "\\."), "[[", 2)))
+ggplot(dat, aes(x = x, y = acl, color = source)) +
+  geom_line() +
+  facet_grid(axis~location) +
+  geom_hline(yintercept = 0, linetype = "dashed", size = 0.3) +
+  ylab("Autocorrelation Function") +
+  xlab("Time Lag") +
+  scale_x_continuous(expand = c(0,0), 
+                     breaks = c(0, 0.25, 0.5, 0.75, 1),
+                     labels=c("0", "0.25", "0.5", "0.75", "1")) +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "bottom") +
+  scale_color_manual(name = "", values = col_vals[c(3, 1, 2)], 
+                     labels = c("Data", "Residuals of Model Fit",
+                                "Residuals of Sensitivity Analysis"))
+
+```
+
+

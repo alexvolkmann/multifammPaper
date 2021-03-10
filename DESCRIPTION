@@ -19,3 +19,7 @@ Imports: multifamm,
     magrittr,
     mvtnorm,
     tidyr
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
