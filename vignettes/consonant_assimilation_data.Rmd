@@ -4,8 +4,10 @@ author: Alexander Volkmann
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{consonant_assimilation_data}
-  %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r, include = FALSE}
@@ -35,12 +37,14 @@ This vignette provides the code to reproduce the analysis of the consonant assim
 ## Plot the Data
 
 ```{r}
-RNGkind(sample.kind = "Rounding")
-set.seed(1234)
-chosen_0 <- sample(unique(subset(phonetic, covariate.1 == 0)$n_long),
-                   size = 3)
-chosen_1 <- sample(unique(subset(phonetic, covariate.1 == 1)$n_long),
-                   size = 3)
+# RNGkind(sample.kind = "Rounding")
+# set.seed(1234)
+# chosen_0 <- sample(unique(subset(phonetic, covariate.1 == 0)$n_long),
+#                    size = 3)
+# chosen_1 <- sample(unique(subset(phonetic, covariate.1 == 1)$n_long),
+#                    size = 3)
+chosen_0 <- c(86, 443, 428)
+chosen_1 <- c(436, 608, 449)
 
 # Prepare data for plotting
 dat <- copy(phonetic)
@@ -56,7 +60,7 @@ dat$cov.1 <- factor(dat$covariate.1,
 dat$dim <- factor(dat$dim, labels = c("ACO", "EPG"))
 dat$alpha <- ifelse(dat$dim == 0, 0.5, 1)
 
-# Plot the data
+# Plot the data (arXiv version)
 ggplot2::ggplot(data = dat,
                          aes(x = t, y = y_vec, group = factor(n_long), 
                              colour = color, alpha = alpha)) +
@@ -66,6 +70,26 @@ ggplot2::ggplot(data = dat,
                                 "steelblue3", "dodgerblue4", "cadetblue",
                                 "firebrick3", "tomato2", "lightsalmon1")) +
   scale_size_manual(values = c(0.3, 0.5,0.5,0.5,0.5,0.5,0.5)) +
+  theme_bw(base_size = 11) +
+  theme(legend.position = "none",
+        strip.text.x = element_text(size = 12)) +
+  ylab("Index Values (Y)") +
+  xlab("Normalized Time (t)") + 
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))
+
+# Plot the data (paper version)
+ggplot2::ggplot(data = dat,
+                         aes(x = t, y = y_vec, group = factor(n_long), 
+                             colour = color, alpha = alpha,
+                             linetype = color)) +
+  geom_line(aes(size = color))+
+  facet_grid(dim ~ cov.1) +
+  scale_color_manual(values = c("grey80",
+                                "steelblue4", "deepskyblue3", "cyan4",
+                                "firebrick3", "tomato3", "violetred3")) +
+  scale_size_manual(values = c(0.3, rep(0.8, 6))) +
+  scale_linetype_manual(values = c("solid", "solid", "11", "81",
+                                   "81", "11", "solid")) +
   theme_bw(base_size = 11) +
   theme(legend.position = "none",
         strip.text.x = element_text(size = 12)) +

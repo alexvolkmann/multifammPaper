@@ -70,6 +70,7 @@ beg <- snooker %>%
   slice(which.min(t)) %>%
   ungroup()
 
+# arXiv version of plot
 ggplot2::ggplot() +
   geom_path(data = snooker, aes(x = x, y = y, group = curve_group, 
                                 colour = color, size = color), alpha = 0.5) +
@@ -78,6 +79,26 @@ ggplot2::ggplot() +
                                 "steelblue3", "dodgerblue4", "cadetblue",
                                 "firebrick3", "tomato2", "lightsalmon1")) +
   scale_size_manual(values =  c(0.3, 0.5,0.5,0.5,0.5,0.5,0.5)) +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "none",
+        strip.text.x = element_text(size = 14)) +
+  ylab("Y") +
+  xlab("X") +
+  geom_point(data = beg, aes(x = x, y = y),
+             shape = 8, size = 0.8, colour = "black", alpha = 0.5)
+
+# paper version of plot
+ggplot2::ggplot() +
+  geom_path(data = snooker, aes(x = x, y = y, group = curve_group, 
+                                colour = color, size = color, linetype = color),
+            alpha = 0.5) +
+  facet_grid(cols = vars(cov.1)) +
+  scale_color_manual(values = c("grey80",
+                                "steelblue4", "deepskyblue3", "cyan4",
+                                "firebrick3", "tomato3", "violetred3")) +
+  scale_size_manual(values =  c(0.3, rep(0.8, 6))) +
+  scale_linetype_manual(values = c("solid", "solid", "11", "81",
+                                   "81", "11", "solid")) +
   theme_bw(base_size = 12) +
   theme(legend.position = "none",
         strip.text.x = element_text(size = 14)) +
@@ -144,7 +165,7 @@ This code reproduces the plots of the main part and the appendix.
 ```{r}
 # Set up ------------------------------------------------------------------
 dimlabels <- names(m$model_indep)
-dat_n <- covariate_plot_helper(model = m2, dimlabels = dimlabels)
+dat_n <- covariate_plot_helper(model = m, dimlabels = dimlabels)
 
 
 # Table of eigenvalue decomposition ---------------------------------------
@@ -168,7 +189,7 @@ mfpca_info <- multifamm:::prepare_mfpca(model_list = m2$model_indep,
                                         fRI_B = TRUE, mfpc_weight = FALSE)
 MFPC <- multifamm:::conduct_mfpca(mfpca_info, mfpc_weight = FALSE)
 tot_var <- sum(unlist(lapply(MFPC, "[[", "values")), unlist(error_var))
-props <- vars/tot_var*100
+props <- c(unlist(eigenvals), unlist(error_var))/tot_var*100
 
 
 # Plot all the different FPCs ---------------------------------------------
@@ -224,7 +245,7 @@ for (i in plot_covs) {
   # Plot the trajectory data
   p1 <- ggplot2::ggplot(data = dat_s) +
     geom_path(aes(x = val_x, y = val_y, group = dim), size = 0.5, 
-              col = "dodgerblue4") +
+              col = "dodgerblue4", linetype = "longdash") +
     geom_path(aes(x = val_x_int, y = val_y_int, group = dim),
               col = "firebrick3", size = 0.5) +
     geom_point(data = beg_s,
