@@ -1,0 +1,1334 @@
+---
+title: "simulation_study"
+author: Alexander Volkmann
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Simulation Study}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = FALSE
+)
+```
+
+```{r setup}
+library(data.table)
+library(funData)
+library(grid)
+library(gridExtra)
+library(multifamm)
+library(multifammPaper)
+library(sparseFLMM)
+library(tidyverse)
+library(viridis)
+data("snooker")
+```
+
+# Simulation Study
+
+This vignette provides the code to reproduce the simulation study presented in the paper "Multivariate functional additive mixed models" (Volkmann et al., 2021). Note that this vignette does not execute the presented code because the required computing resources are large. The code to reproduce a specific simulation scenario is analogue to the code given here (mainly benchmark scenario). The functions are all documented so that by specifying the respective arguments, a new scenario can be easily created. The simulation results are large objects.
+
+## Data Generation
+
+Use this code to simulate new data based on data generation setting 1:
+ - phonetic data
+ - dense observations
+ - uncorrelated & centered scores
+ 
+```{r}
+# Set up ------------------------------------------------------------------
+
+# Name of the new folder
+new_folder <- "data/datasetting_1"
+
+# General setup
+start <- 100
+stop <- 599
+dir.create(new_folder, showWarnings = FALSE)
+setwd(new_folder)
+library(multifamm)
+library(multifammPaper)
+Sys.time()
+sessionInfo()
+
+# Load the original model of the phonetic data
+
+# load("m_mul.Rdata")
+sigma2 <- m_mul$model$sig2 / unique(m_mul$model$weights)
+
+
+
+# Data generation ---------------------------------------------------------
+
+# Loop to generate 500 simulated data sets and save them
+for (i in start:stop){
+  set.seed(i)
+  sim_dat <- gendata(I = 9, J = 16, nested = FALSE, num_dim = 2, 
+                     lamB = m_mul$mfpc$B$values, lamC = NULL, 
+                     lamE = m_mul$mfpc$E$values,
+                     normal = TRUE, sigmasq = as.list(sigma2),
+                     dim_indep = TRUE, simple_sig = TRUE, mu = NULL,
+                     N_B = 3, N_C = 0, N_E = 5,
+                     phiB_fun = m_mul$mfpc$B$functions, 
+                     phiC_fun = NULL, 
+                     phiE_fun = m_mul$mfpc$E$functions, 
+                     minsize = 20, maxsize = 50,
+                     min_grid = 0, max_grid = 1, grid_eval = 100,
+                     min_visit = 5, max_visit = 5,
+                     use_RI = FALSE, covariate = TRUE, num_cov = 4, 
+                     interaction = TRUE,
+                     which_inter = matrix(c(FALSE, TRUE, TRUE, TRUE,
+                                            TRUE,FALSE,FALSE,FALSE,
+                                            TRUE,FALSE,FALSE,FALSE,
+                                            TRUE,FALSE,FALSE,FALSE),
+                                          nrow = 4),
+                     model = m_mul$model,
+                     center_scores = TRUE, decor_scores = TRUE)
+              
+  save(sim_dat, file = paste0("sim_dat_", i, ".Rdata"))                   
+}
+
+
+rm(list = ls())
+```
+Other data settings are generated accordingly but with different specifications in the gendata() function or based on a different model.
+
+## Fitting the multiFAMM-Models
+
+Use this code to fit models based on model specifications A:
+  - fixed multivariate cutoff
+  - heteroscedasticity
+  - unweighted MFPCA (depending on the data setting)
+```{r}
+# Set up ------------------------------------------------------------------
+
+# Name of the new folder
+datasetting <- "1"
+modelscenar <- "a"
+
+# General setup
+start <- 100
+stop <- 599
+number_cores <- 20 # depending on the resources available
+
+newfolder <- file.path("models", paste0("modelscen_", datasetting, 
+                                        modelscenar))
+dir.create(newfolder, showWarnings = FALSE)
+setwd(newfolder)
+library(multifamm)
+library(parallel)
+
+
+
+# Helper function for simulation ------------------------------------------
+
+# Loop to compute the multiFAMM models on the simulated data sets and save the 
+# interesting model components
+model_on_sim <- function (i, datasetting, modelscenar, wd, libpath) {
+  
+  try({
+    
+    setwd(wd)
+    load(file = file.path("data", paste0("datasetting_", datasetting), 
+                          paste0("sim_dat_", i, ".Rdata")))
+
+    if(!require(multifamm)) stop()
+    
+    
+    #*************************************************************
+    # Multivariate Model
+    #*************************************************************
+    
+    # Modeling scenario A
+    m <- multiFAMM(data = sim_dat$curve_info,
+                   fRI_B = TRUE, fRI_C = FALSE, nested = FALSE,
+                   bs = "ps", bf_mean = 8, bf_covariates = 8, m_mean = c(2, 3),
+                   covariate = TRUE, num_covariates = 4,
+                   covariate_form = c("by", "by", "by", "by"),
+                   interaction = TRUE,
+                   which_interaction =  matrix(c(FALSE, TRUE, TRUE, TRUE,
+                                                 TRUE,FALSE,FALSE,FALSE,
+                                                 TRUE,FALSE,FALSE,FALSE,
+                                                 TRUE,FALSE,FALSE,FALSE),
+                                               nrow = 4),
+                   bf_covs = c(5, 5), m_covs = list(c(2, 3), c(2, 3)),
+                   var_level = 1, use_famm = FALSE, save_model_famm = FALSE,
+                   one_dim = NULL,
+                   mfpc_cutoff = 0.95, number_mfpc = list("E" = 5, "B" = 3),
+                   mfpc_cut_method = "total_var", mfpc_weight = FALSE,
+                   final_method = "w_bam")
+    
+    # Extract interesting model components
+    m_comp <- multifamm:::extract_components(model = m,
+                                             dimnames = c("dim1", "dim2"))
+    
+    # Clear workspace of big model object
+    rm(m)
+    
+    # Univariate models need not be computed in all simulation scenarios
+    #***************************************************************
+    # Univariate Models
+    #***************************************************************
+    
+    # # Modeling scenario U
+    # m_dim1 <- multiFAMM(data = sim_dat$curve_info,
+    #                     fRI_B = TRUE, fRI_C = FALSE, nested = FALSE,
+    #                     bs = "ps", bf_mean = 8, bf_covariates = 8,
+    #                     m_mean = c(2, 3),
+    #                     covariate = TRUE, num_covariates = 4,
+    #                     covariate_form = c("by", "by", "by", "by"),
+    #                     interaction = TRUE,
+    #                     which_interaction =  matrix(c(FALSE, TRUE, TRUE, TRUE,
+    #                                                   TRUE,FALSE,FALSE,FALSE,
+    #                                                   TRUE,FALSE,FALSE,FALSE,
+    #                                                   TRUE,FALSE,FALSE,FALSE),
+    #                                                 nrow = 4),
+    #                     bf_covs = c(5, 5), m_covs = list(c(2, 3), c(2, 3)),
+    #                     var_level = 0.95, 
+    #                     use_famm = TRUE, save_model_famm = TRUE,
+    #                     one_dim = "dim1",
+    #                     mfpc_cutoff = 0.95,
+    #                     mfpc_cut_method = "total_var", mfpc_weight = FALSE,
+    #                     final_method = "w_bam")
+    # 
+    # # Extract interesting model components
+    # m_dim1_comp <- multifamm:::extract_components_uni(model = m_dim1)
+    # 
+    # # Clear workspace of big model object
+    # rm(m_dim1)
+    # 
+    # # Modeling scenario U
+    # m_dim2 <- multiFAMM(data = sim_dat$curve_info,
+    #                     fRI_B = TRUE, fRI_C = FALSE, nested = FALSE,
+    #                     bs = "ps", bf_mean = 8, bf_covariates = 8,
+    #                     m_mean = c(2, 3),
+    #                     covariate = TRUE, num_covariates = 4,
+    #                     covariate_form = c("by", "by", "by", "by"),
+    #                     interaction = TRUE,
+    #                     which_interaction =  matrix(c(FALSE, TRUE, TRUE, TRUE,
+    #                                                   TRUE,FALSE,FALSE,FALSE,
+    #                                                   TRUE,FALSE,FALSE,FALSE,
+    #                                                   TRUE,FALSE,FALSE,FALSE),
+    #                                                 nrow = 4),
+    #                     bf_covs = c(5, 5), m_covs = list(c(2, 3), c(2, 3)),
+    #                     var_level = 0.95,
+    #                     use_famm = TRUE, save_model_famm = TRUE,
+    #                     one_dim = "dim2",
+    #                     mfpc_cutoff = 0.95,
+    #                     mfpc_cut_method = "total_var", mfpc_weight = FALSE,
+    #                     final_method = "w_bam")
+    # 
+    # # Extract interesting model components
+    # m_dim2_comp <- multifamm:::extract_components_uni(model = m_dim2)
+    # 
+    # # Clear workspace of big model object
+    # rm(m_dim2)
+    
+    
+    #********************************************************
+    # Extract the Components to be Analyzed
+    #********************************************************
+    
+    # Extract the true Random Effects and true Covariate Effects from the data 
+    sc_true <- list("E" = sim_dat$xiE, "B" = sim_dat$xiB, "C" = sim_dat$xiC)
+    re_true <- sim_dat$re
+    mu_true <- sim_dat$mu
+    
+    out <- list("mul" = m_comp,
+                # "uni" = list("dim1" = m_dim1_comp,
+                #              "dim2" = m_dim2_comp),
+                "tru" = list("sc" = sc_true,
+                             "re" = re_true,
+                             "mu" = mu_true))
+    
+    # Remove extracted components
+    rm(m_comp, m_dim1_comp, m_dim2_comp, sc_true, re_true, mu_true)
+    out
+  })
+  
+}
+
+
+
+# Simulation --------------------------------------------------------------
+
+# Actual parallel section
+cat(paste("Parallelization:", start, "-", stop, "on", number_cores, "cores.\n"))
+cl <- makePSOCKcluster(number_cores)
+sim_res <- parLapply(cl, start:stop, model_on_sim,
+                     datasetting = datasetting, modelscenar = modelscenar,
+                     wd = wd, libpath = libpath)
+stopCluster(cl)
+
+
+
+# Saving and extracting ---------------------------------------------------
+
+# Save the entire list
+save(sim_res, file = paste0("sim_res_", start, "_", stop, ".Rdata"))
+
+
+# Create lists to save the model components to be analyzed
+error_var <- list()
+eigenvals <- list()
+fitted_cu <- list()
+eigenfcts <- list()
+cov_preds <- list()
+ran_preds <- list()
+eigscores <- list()
+
+# Append estimated error variances to list
+error_var$mul <- lapply(sim_res, function (x) {
+  try(x$mul$error_var)
+})
+# error_var$uni <- lapply(sim_res, function (x) {
+#   try(list("dim1" = x$uni$dim1$error_var, "dim2" = x$uni$dim2$error_var))
+# })
+
+# Append estimated eigenvalues to list
+eigenvals$mul <- lapply(sim_res, function (x) {
+  try(x$mul$eigenvals)
+})
+# eigenvals$uni <- lapply(sim_res, function (x) {
+#   try(list("dim1" = x$uni$dim1$eigenvals, "dim2" = x$uni$dim2$eigenvals))
+# })
+
+# Evaluate estimated scores and append to list
+eigscores$mul <- lapply(sim_res, function (x) {
+  try(x$mul$scores)
+})
+# eigscores$uni <- lapply(sim_res, function (x) {
+#   try(list("dim1" = x$uni$dim1$scores, "dim2" = x$uni$dim2$scores))
+# })
+eigscores$tru <- lapply(sim_res, function (x) {
+  try(x$tru$sc)
+})
+
+# Evaluate fitted values and append to list
+fitted_cu$mul <- lapply(sim_res, function (x) {
+  try(x$mul$fitted_curves)
+})
+# fitted_cu$uni <- lapply(sim_res, function (x) {
+#   try(list("dim1" = x$uni$dim1$fitted_curves, 
+#            "dim2" = x$uni$dim2$fitted_curves))
+# })
+fitted_cu$tru <- lapply(sim_res, function (x) {
+  try(list("mu" = x$tru$mu, "re" = x$tru$re))
+})
+
+# Evaluate eigenfunctions and append to list
+eigenfcts$mul <- lapply(sim_res, function (x) {
+  try(x$mul$eigenfcts)
+})
+# eigenfcts$uni <- lapply(sim_res, function (x) {
+#   try(list("dim1" = x$uni$dim1$eigenfcts, "dim2" = x$uni$dim2$eigenfcts))
+# })
+
+# Evaluate random effects and append to list
+ran_preds$mul <- lapply(sim_res, function (x) {
+  try(x$mul$ran_preds)
+})
+# ran_preds$uni <- lapply(sim_res, function (x) {
+#   try(list("dim1" = x$uni$dim1$ran_preds, "dim2" = x$uni$dim2$ran_preds))
+# })
+ran_preds$tru <- lapply(sim_res, function (x) {
+  try(x$tru$re)
+})
+
+# Evaluate covariate effects and append to list
+cov_preds$mul <- lapply(sim_res, function (x) {
+  try(x$mul$cov_preds)
+})
+# cov_preds$uni <- lapply(sim_res, function (x) {
+#   try(list("dim1" = x$uni$dim1$cov_preds, "dim2" = x$uni$dim2$cov_preds))
+# })
+
+
+# Save the lists containing the results
+save(error_var, file = paste0("error_var_", start, "_", stop, ".Rdata"))
+save(eigenvals, file = paste0("eigenvals_", start, "_", stop, ".Rdata"))
+save(fitted_cu, file = paste0("fitted_cu_", start, "_", stop, ".Rdata"))
+save(eigenfcts, file = paste0("eigenfcts_", start, "_", stop, ".Rdata"))
+save(cov_preds, file = paste0("cov_preds_", start, "_", stop, ".Rdata"))
+save(ran_preds, file = paste0("ran_preds_", start, "_", stop, ".Rdata"))
+save(eigscores, file = paste0("eigscores_", start, "_", stop, ".Rdata"))
+
+
+rm(list = ls())
+```
+
+## Evaluation of Results
+
+This code reproduces all the results of the simulation study presented in the main part and the appendix.
+```{r}
+# Set Up ------------------------------------------------------------------
+
+library(multifamm)
+library(multifammPaper)
+library(tidyverse)
+library(funData)
+library(RColorBrewer)
+library(xtable)
+
+# Specify for each scenario
+pho_models <- c("c_mul", "c_wei")
+sno_models <- c("c_sno")
+ndim_pho <- 2
+ndim_sno <- 6
+
+# Load the original data
+# wd_sim is the path to the simulation results
+# wd_res is the path to the data generating models
+setwd(wd_sim)
+for (model in pho_models) {
+  load(paste0(wd_res, model, ".Rdata"))
+}
+load(paste0(wd_res, sno_models, ".Rdata"))
+
+
+# Rename dimensions of model otherwise there is an error message
+for (model in c(pho_models, sno_models)) {
+  for (comp in names(get(model)$eigenfcts)) {
+    m <- get(model)
+    names(m$eigenfcts[[comp]]) <- paste0("dim", seq_along(m$error_var$uni_vars))
+    assign(model, m)
+    rm(m)
+  }
+  
+}
+
+# Coefficient labels for the plot
+coef_pho <- c("{beta[0]}", "{beta[0]}(t)", "{beta[1]}(t)", "{beta[2]}(t)",
+              "{beta[3]}(t)", "{beta[4]}(t)", "{beta[5]}(t)", "{beta[6]}(t)",
+              "{beta[7]}(t)")
+coef_sno <- c("{beta[0]}", "{beta[0]}(t)", "{beta[1]}(t)", "{beta[2]}(t)",
+              "{beta[3]}(t)", "{beta[4]}(t)")
+unicoefs <- c(1, 2, 3, 7, 8, 9, 4, 5, 6)
+
+# Parameters for plot 
+dpi <- 300
+width <- 5.5
+height <- 4
+# wd_plots is path to where to save the plots
+plot <- wd_plots
+
+
+
+# MULTIVARIATE PLOT -------------------------------------------------------
+
+# The scenario naming can be different
+scenario1 <- c("1A", "1B", "1C", "1D", "1E", "1F", "2A", "3A", "4A", "5A")
+fixed_fpc1 <- c(TRUE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE)
+uni1 <- c(FALSE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE)
+models1 <- c(rep(pho_models[1], 9), pho_models[2])
+fill_vals1 <- c(rev(brewer.pal(n = 7, name = "Blues")[-1]),
+                rev(brewer.pal(n = 4, name = "Greens"))[1],
+                brewer.pal(n = 6, name = "Set3")[c(2, 6, 4)])
+
+# Evaluate the model scenarios
+dat_r <- do.call(rbind, mapply(function (scen, fixed, model) {
+  dat <- sim_eval_components(folder = paste0("modelscen_", scen),
+                                         m_true_comp = get(model),
+                                         label_cov = coef_pho,
+                                         relative =  TRUE,
+                                         fixed_fpc = fixed)
+  dat$method <- factor(scen)
+  dat
+}, scen = scenario1, fixed = fixed_fpc1, model = models1, SIMPLIFY = FALSE))
+
+# Adapt the model
+dat <- dat_r %>%
+  filter(comp == "Fit") %>%
+  droplevels() %>%
+  transform(no = factor(no, levels = c("Y", "mu", "B", "E"), 
+                        labels = c("y[ijh](t)", "mu(x[ij],t)", "B[i](t)",
+                                   "E[ijh](t)"))) %>%
+  # for smaller plot in main paper
+  filter(method %in% c("1A", "1B", "1C", "3A", "4A")) %>%
+  transform(method = factor(method,
+                            labels = c("Benchmark", "Cut-Off Multi", 
+                                       "Cut-Off Uni", "Sparse Data", 
+                                       "Uncentered Scores")))
+
+# Plot for fitted functions
+ggplot2::ggplot(data = dat,
+                aes(y = y, fill = method)) +
+  geom_boxplot(size = 0.25, width = 3,
+               outlier.size = 0.25) +
+  facet_wrap( ~ no, scales = "free", labeller = label_parsed, nrow = 1) +
+  theme_bw(base_size = 12) +
+  theme(axis.title.x=element_blank(),
+        legend.position = "bottom", legend.direction = "horizontal",
+        strip.text.x = element_text(size = 12)) +
+  scale_x_discrete(labels =function(l) parse(text=l)) +
+  scale_fill_manual(values = fill_vals1[c(2, 4, 6, 9, 10)],
+                    guide = guide_legend(nrow = 1, title = "Scenario")) +
+  ylab("rrMSE")
+ggsave(filename = "sim_multivariate_abr.png", device = "png", path = plot, 
+       dpi = dpi + 200, width = width +4.1, height = height+0.5)
+
+
+
+# UNIVARIATE PLOT ---------------------------------------------------------
+
+scenario2 <- c("1U", "1C", "1E", "2U", "2C", "2E")
+uni2 <- c(TRUE, FALSE, FALSE, TRUE, FALSE, FALSE)
+fill_vals2 <- c(brewer.pal(n = 7, name = "Greys")[3],
+                rev(brewer.pal(n = 7, name = "Blues"))[c(3, 5)],
+                brewer.pal(n = 7, name = "Greys")[5],
+                rev(brewer.pal(n = 7, name = "Greens"))[c(3, 5)])
+
+# Evaluate the model scenarios
+dat_r <- do.call(rbind, mapply(function (scen, uni, relative = TRUE) {
+  dat <- sim_eval_dimensions(folder = paste0("modelscen_", scen),
+                                         m_true_comp = get(pho_models[1]),
+                                         label_cov = coef_pho,
+                                         uni_compare = uni,
+                                         relative = relative)
+  if (uni) {
+    levels(dat$method) <- c(scen, paste0(scen, "uni"))
+  } else {
+    levels(dat$method) <- c(scen)
+  }
+  dat$Method <- interaction(dat$method, dat$dim)
+  dat
+}, scen = scenario2, uni = uni2, SIMPLIFY = FALSE))
+
+# Adapt the model
+dat <- dat_r %>%
+  filter(comp == "Fit", !method %in% c("1c", "1-4c")) %>%
+  droplevels() %>%
+  transform(no = factor(no, levels = c("Y", "mu", "B", "E"), 
+                         labels = c("y[ijh](t)", "mu(x[ij],t)", "B[i](t)",
+                                    "E[ijh](t)")))
+
+# Plot for fitted functions and sigma
+ggplot2::ggplot(data = dat,
+                aes(y = y, fill = method)) +
+  geom_boxplot(width = 3, size = 0.25,
+               outlier.size = 0.25) +
+  facet_wrap(dim ~ no, scales = "free", nrow = 2,
+             labeller = label_parsed) +
+  theme_bw(base_size = 10) +
+  theme(axis.title.x=element_blank(),
+        legend.position = "bottom", legend.direction = "horizontal",
+        strip.text.x = element_text(size = 10)) +
+  scale_x_discrete(labels =function(l) parse(text=l)) +
+  scale_fill_manual(values = fill_vals2,
+                    guide = guide_legend(nrow = 1, title = "Scenario")) +
+  ylab("urrMSE")
+ggsave(filename = "sim_univariate.png", device = "png", path = plot, 
+       dpi = dpi + 200, width = width +4.1, height = height+0.9)
+
+
+
+# TABLE NUMBER OF FPCS ----------------------------------------------------
+
+scenario3 <- c("1A", "1B", "1C", "1D", "1E", "2U", "2C", "2D",
+               "2E")
+uni3 <- c(FALSE, rep(c(TRUE, rep(FALSE, 3)), 2))
+
+# Extract the info of how many FPCs have been selected
+nfpc <- do.call(rbind, mapply(function (scen, uni){
+  
+  dat <- return_number_fpcs(folder = paste0("modelscen_", scen), 
+                                          uni = uni)
+  if (uni) {
+    dat$method <- factor(dat$dim, 
+                         levels = levels(dat$dim),
+                         labels = c(scen, paste0(scen, levels(dat$dim)[-1])))
+    dat$dim <- NULL
+  } else {
+    levels(dat$method) <- scen
+  }
+  dat 
+  
+}, scen = scenario3, uni = uni3, SIMPLIFY = FALSE))
+nfpc %>%
+  group_by(method, no) %>% 
+  summarise(sum = sum(y) / 500) %>% 
+  pivot_wider(id_cols = no, names_from = method, values_from = sum) %>%
+  xtable()
+
+
+# APPENDIX: Univariate MSEs -----------------------------------------------
+
+scenarioA1 <- c("1A", "1B", "1C", "1D", "1E", "1U", "2A", "2B", "2C", "2D",
+                "2E", "2U")
+uniA1 <- c(FALSE, TRUE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE)
+fill_valsA1 <- c(rev(brewer.pal(n = 7, name = "Blues"))[1:5],
+                 brewer.pal(n = 7, name = "Greys")[3],
+                 rev(brewer.pal(n = 7, name = "Greens"))[1:5],
+                 brewer.pal(n = 7, name = "Greys")[5])
+
+# Evaluate the model scenarios
+dat_r <- do.call(rbind, mapply(function (scen, uni, relative = TRUE) {
+  dat <- sim_eval_dimensions(folder = paste0("modelscen_", scen),
+                                         m_true_comp = get(pho_models[1]),
+                                         label_cov = coef_pho,
+                                         uni_compare = uni,
+                                         relative = relative)
+  if (uni) {
+    levels(dat$method) <- c(scen, paste0(scen, "uni"))
+  } else {
+    levels(dat$method) <- c(scen)
+  }
+  dat$Method <- interaction(dat$method, dat$dim)
+  dat
+}, scen = scenarioA1, uni = uniA1, SIMPLIFY = FALSE))
+
+# Adapt the model
+dat <- dat_r %>%
+  filter(comp == "Fit") %>%
+  droplevels() %>%
+  transform(no = factor(no, levels = c("Y", "mu", "B", "E"), 
+                        labels = c("y[ijh](t)", "mu(x[ij],t)", "B[i](t)",
+                                   "E[ijh](t)")))
+
+# Plot for fitted functions and sigma
+ggplot2::ggplot(data = dat,
+                aes(y = y, fill = method)) +
+  geom_boxplot(width = 3, size = 0.25,
+               outlier.size = 0.25) +
+  facet_wrap(dim ~ no, scales = "free", nrow = 2,
+             labeller = label_parsed) +
+  theme_bw(base_size = 8) +
+  theme(axis.title.x=element_blank(),
+        legend.position = "bottom", legend.direction = "horizontal") +
+  scale_x_discrete(labels =function(l) parse(text=l)) +
+  scale_fill_manual(values = fill_valsA1,
+                    guide = guide_legend(nrow = 1, title = "Scenario")) +
+  ylab("urrMSE")
+ggsave(filename = "app_umse.png", device = "png", path = plot, 
+       dpi = dpi + 200, width = width +4.1, height = height+0.9)
+
+
+
+# APPENDIX: Covariate urrMSE ----------------------------------------------
+
+scenarioAA1 <- c("1A", "4A")
+uniAA1 <- rep(FALSE, 2)
+dat <- do.call(rbind, mapply(function (scen, uni, relative = TRUE) {
+  dat <- sim_eval_dimensions(folder = paste0("modelscen_", scen),
+                             m_true_comp = get(pho_models[1]),
+                             label_cov = coef_pho,
+                             uni_compare = uni,
+                             relative = relative)
+  if (uni) {
+    levels(dat$method) <- c(scen, paste0(scen, "uni"))
+  } else {
+    levels(dat$method) <- c(scen)
+  }
+  dat$Method <- interaction(dat$method, dat$dim)
+  dat
+}, scen = scenarioAA1, uni = uniAA1, SIMPLIFY = FALSE))
+da <- dat %>%
+  filter(comp == "Effectfunctions") %>%
+  droplevels() %>%
+  mutate(no = factor(no, labels = gsub("beta", "f", levels(no))))
+fill_valsAA1 <- c(brewer.pal(n = 7, name = "Blues")[7],
+                  brewer.pal(n = 6, name = "Set3")[6])
+
+# Plot for fitted functions and sigma
+ggplot2::ggplot(data = da,
+                aes(y = y, x = no, fill = method)) +
+  geom_boxplot(size = 0.25,
+               outlier.size = 0.25) +
+  facet_grid(dim ~ comp, scales = "free") +
+  theme_bw(base_size = 12) +
+  theme(axis.title.x=element_blank(),
+        legend.position = "bottom") +
+  scale_x_discrete(labels =function(l) parse(text=l)) +
+  scale_fill_manual(values = fill_valsAA1,
+                    guide = guide_legend(nrow = 1, title = "Scenario")) +
+  ylab("urrMSE")
+ggsave(filename = "app_sim_umse_effects.png", device = "png", path = plot, 
+       dpi = dpi + 200, width = width, height = height+0.9)
+
+# For the snooker data
+dat_s <- sim_eval_dimensions(folder = "modelscen_6A",
+                                       m_true_comp = get(sno_models),
+                                       label_cov = coef_sno,
+                                       uni_compare = FALSE,
+                                       relative = TRUE,
+                                       I = 25, J = 2, reps = 6, nested = TRUE)
+
+dat <- dat_s %>%
+  filter(comp == "Effectfunctions") %>%
+  droplevels() %>%
+  mutate(no = factor(no, labels = gsub("beta", "f", levels(no))))
+
+ggplot2::ggplot(data = dat,
+                aes(y = y, x = dim)) +
+  geom_boxplot(size = 0.25,
+               outlier.size = 0.25) +
+  facet_wrap(no ~ ., scales = "free", labeller = label_parsed) +
+  theme_bw(base_size = 12) +
+  theme(axis.title.x=element_blank()) +
+  scale_x_discrete(labels =function(l) parse(text=l)) +
+  ylab("urrMSE")
+ggsave(filename = "sim_umse_eff_sno.png", device = "png", path = plot, 
+       dpi = dpi + 200, width = width +4.1, height = height+0.9)
+
+
+# APPENDIX: Number of FPCs ------------------------------------------------
+
+scenarioA2 <-  c("1U", "1B", "1C", "1D", "1E") 
+uniA2 <-c(TRUE, rep(FALSE, 3))
+
+# Extract the info of how many FPCs have been selected
+nfpc <- do.call(rbind, mapply(function (scen, uni){
+  dat <- return_number_fpcs(folder = paste0("modelscen_", scen), 
+                                        uni = uni)
+  if (uni) {
+    dat$method <- factor(dat$dim, 
+                         levels = levels(dat$dim),
+                         labels = c(scen, paste0(scen, levels(dat$dim)[-1])))
+    dat$dim <- NULL
+  } else {
+    levels(dat$method) <- scen
+  }
+  dat
+}, scen = scenarioA2, uni = uniA2, SIMPLIFY = FALSE))
+nfpc <- pivot_wider(nfpc, id_cols = c("it", "method"), names_from = "no", 
+                         values_from = "y")
+
+dat <- dat_r %>%
+  filter(no == "Y", method %in% scenarioA2) %>% 
+  droplevels() %>%
+  left_join(nfpc, by = c("it", "m" = "method")) %>%
+  mutate(model = factor(paste0("B", B, "-E", E)))
+
+# Plot rrMSE values for Fit
+ggplot2::ggplot(data = dat,
+                aes(y = y, x = model, fill = model)) +
+  geom_boxplot(size = 0.25,
+               outlier.size = 0.25) +
+  facet_grid(dim ~ method, space = "free_x", scales = "free") +
+  theme_bw(base_size = 12) +
+  theme(axis.title.x=element_blank(),
+        legend.position = "bottom", legend.direction = "horizontal") +
+  scale_fill_manual(values = brewer.pal(n = length(levels(dat$model)), 
+                                        name = "Purples"),
+                    guide = guide_legend(nrow = 1, title = "Number of FPCs")) +
+  ylab("urrMSE") +
+  ggtitle(expression(paste("urrMSE of ", y[ijh](t), " and Number of FPCs")))
+ggsave(filename = "app_sim_nfpc_y.png", device = "png", path = plot, 
+       dpi = dpi + 200, width = width +4.1, height = height+0.9)
+
+
+
+# APPENDIX: Coverage Plot -------------------------------------------------
+
+scenarioA3 <- c("1A", "1B", "2U", "1C", "1D", "1E", "1F", "2A", "3A",
+                "4A", "5A", "6A")
+uniA3 <- c(FALSE, FALSE, TRUE, rep(FALSE, 9))
+modelA3 <- c(rep("c_mul", 10), "c_wei", "c_sno")
+
+
+coverage <- mapply(function (scen, uni, model) {
+  out <- lapply(seq(1, if (model == "c_sno") 6 else 9), 
+                create_coverage_array,
+                sim_curves = load_sim_results(
+                  folder = paste0("modelscen_", scen), component = "cov_preds",
+                  uni = uni)[[if (uni) "uni" else "mul"]],
+                gen_curves = get(model)$cov_preds, 
+                uni = if (uni) unicoefs)
+  names(out) <- if (model == "c_sno") coef_sno else coef_pho
+  out
+}, scen = scenarioA3, uni = uniA3, model = modelA3, SIMPLIFY = FALSE)
+names(coverage) <- paste0(names(coverage), ifelse(uniA3, "uni", ""))
+
+# Average coverage
+avg_cov <- lapply(coverage, function (scen) {
+  out <- lapply(scen, function (effect) {
+    apply(effect, MARGIN = 1, sum) / (100 * dim(effect)[3])
+  })
+  out <- t(do.call(rbind, out))
+  data.frame(dim = paste0("dim", seq_len(dim(scen[[1]])[1])), out)
+})
+cov_pho <- avg_cov[-length(avg_cov)] %>% 
+  bind_rows(.id = "scenario") %>%
+  arrange(dim) %>%
+  mutate_if(is.numeric, function (x) round(x*100, digits = 1))
+stargazer::stargazer(cov_pho[, -2], summary = FALSE, digits = 1)
+cov_sno <- avg_cov[[12]] %>%
+  mutate_if(is.numeric, function (x) round(x*100, digits = 1))
+stargazer::stargazer(cov_sno, summary = FALSE, digits = 1)
+
+# Prepare the data set for the plot
+dat <- coverage_plot_helper(coverage$`1A`,
+                            effect_index = 2:length(coef_pho),
+                            dimlabels = paste0("dim", seq_len(ndim_pho)))
+# Plot the data
+ggplot2::ggplot(data = dat, aes(x = t, y = y)) +
+  geom_line(size = 0.5) +
+  geom_hline(yintercept = 0.95, linetype = "dotted", size = 0.25, col = "red") +
+  facet_grid(dim ~ effect, labeller = label_parsed) +
+  xlab("Normalized Time (t)") +
+  ylab(expression("Coverage of" ~ f^(d)~"(t)")) +
+  theme_bw(base_size = 12)  +
+  theme(legend.position = "bottom", legend.direction = "horizontal") +
+  scale_y_continuous(limits = c(0, 1)) +
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))
+ggsave(filename = "app_sim_coverage.png", device = "png", path = plot, 
+       dpi = dpi + 200, width = width +4.1, height = height+0.9)
+
+# For the snooker data scenario
+dat <- coverage_plot_helper(coverage$`6A`,
+                                        effect_index = 2:length(coef_sno),
+                                        dimlabels = paste0("dim",
+                                                           seq_len(ndim_sno)))
+# Plot the data
+ggplot2::ggplot(data = dat, aes(x = t, y = y)) +
+  geom_line(size = 0.5) +
+  geom_hline(yintercept = 0.95, linetype = "dotted", size = 0.25, col = "red") +
+  facet_grid(dim ~ effect, labeller = label_parsed) +
+  xlab("Normalized Time (t)") +
+  ylab(expression("Coverage of" ~ f^(d)~"(t)")) +
+  theme_bw(base_size = 8)  +
+  theme(legend.position = "bottom", legend.direction = "horizontal") +
+  scale_y_continuous(limits = c(0, 1)) +
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))
+ggsave(filename = "app_sim_coverage_sno.png", device = "png", path = plot, 
+       dpi = dpi + 200, width = width, height = height+1.9)
+
+
+# APPENDIX: Estimated Effect Functions ------------------------------------
+
+# For the phonetic scenario
+cov_preds <- load_sim_results(folder = "modelscen_1A",
+                                          component = "cov_preds")
+effects <- c(2:9)
+
+dat_cov <- lapply(effects, function (effect) {
+  extract_Covfct_sim(term = names(cov_preds$mul[[1]]$fit)[effect], 
+                                 m_true_comp = c_mul,
+                                 cov_preds = cov_preds) %>%
+    funData2DataFrame() %>%
+    mutate(source = factor(ifelse(obs != length(unique(obs)), "sim", "tru")),
+           effect = factor(paste0("f[", effect - 2, "](t)")),
+           dim = factor(paste0("dim", dim)))
+})
+dat_cov <- do.call(rbind, dat_cov)
+
+ggplot2::ggplot(data = dat_cov, 
+                aes(x = t, y = y, group = obs, colour = source)) +
+  geom_hline(yintercept = 0, linetype = "dotted", size = 0.3) +
+  geom_line()+
+  facet_grid(dim ~ effect, labeller = label_parsed) +
+  scale_color_manual(values = c("grey80", "red")) +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "none") +
+  ylab(expression("Effect Function (" ~ f^(d) ~")")) +
+  xlab("Normalized Time (t)") +
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))
+ggsave(filename = "app_sim_esteff.png", device = "png", path = plot, 
+       dpi = dpi + 200, width = width +4.1, height = height+0.9)
+
+dat_coverage <- lapply(effects, function (effect) {
+  coverage_area_helper(cov_preds$mul, effect_index = effect) %>%
+    mutate(cov = replace(cov, cov == 0, NA),
+           effect = factor(paste0("f[", effect - 2, "](t)")))
+})
+dat_coverage <- do.call(rbind, dat_coverage)
+
+dat_effect <- lapply(effects, function (effect) {
+  if (effect %in% c(1, 2)) {
+    effect <- 2
+    mfdata <- c_mul$cov_preds$fit[[1]] + c_mul$cov_preds$fit[[2]]
+  } else {
+    mfdata <- c_mul$cov_preds$fit[[effect]]
+  }
+  funData2DataFrame(mfdata) %>%
+    mutate(dim = factor(dim, labels = c("dim1", "dim2")),
+           effect = factor(paste0("f[", effect - 2, "](t)")))
+})
+dat_effect <- do.call(rbind, dat_effect)
+
+ggplot(dat_coverage, aes(x = t)) +
+  geom_hline(yintercept = 0, linetype = "dotted", size = 0.3) +
+  geom_tile(aes(y = ypos, fill = cov)) +
+  facet_grid(dim ~ effect, labeller = label_parsed) +
+  scale_fill_gradient(low = "#E7E7E7", high = "#323232",
+                      na.value = "transparent", limits = c(0, 1),
+                      name = "Coverage") +
+  geom_line(data = dat_effect, aes(y = y), na.rm = TRUE, col = "red") +
+  theme_bw(base_size = 8) +
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1")) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ylab(expression("CI Covered Area of" ~ f^(d))) +
+  xlab("Normalized Time (t)")
+ggsave(filename = "app_sim_covarea.png", device = "png", path = plot, 
+       dpi = dpi + 200, width = width +4.1, height = height+0.9)
+
+# For the snooker scenario
+cov_preds <- load_sim_results(folder = "modelscen_6A",
+                                          component = "cov_preds")
+effects <- c(2:6)
+
+dat_cov <- lapply(effects, function (effect) {
+  extract_Covfct_sim(term = names(cov_preds$mul[[1]]$fit)[effect], 
+                                 m_true_comp = c_sno,
+                                 cov_preds = cov_preds) %>%
+    funData2DataFrame() %>%
+    mutate(source = factor(ifelse(obs != length(unique(obs)), "sim", "tru")),
+           effect = factor(paste0("f[", effect - 2, "](t)")),
+           dim = factor(paste0("dim", dim)))
+})
+dat_cov <- do.call(rbind, dat_cov)
+
+ggplot2::ggplot(data = dat_cov, 
+                aes(x = t, y = y, group = obs, colour = source)) +
+  geom_hline(yintercept = 0, linetype = "dotted", size = 0.3) +
+  geom_line()+
+  facet_grid(dim ~ effect, scales = "free_y", labeller = label_parsed) +
+  scale_color_manual(values = c("grey80", "red")) +
+  theme_bw(base_size = 8) +
+  theme(legend.position = "none") +
+  ylab(expression("Effect Function (" ~ f^(d) ~")")) +
+  xlab("Normalized Time (t)") +
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))
+ggsave(filename = "app_sim_esteff_sno.png", device = "png", path = plot, 
+       dpi = dpi + 200, width = width, height = height+1.9)
+
+
+# APPENDIX: FPC Estimation ------------------------------------------------
+
+scenarioA4 <- c("1A", "2A", "3A", "4A", "5A")
+modelsA4 <- c(rep(pho_models[1], 4), pho_models[2])
+fill_valsA4 <- c(rev(brewer.pal(n = 7, name = "Blues")[7]),
+                 rev(brewer.pal(n = 4, name = "Greens"))[1],
+                 brewer.pal(n = 6, name = "Set3")[c(2, 6, 4)])
+sigma2 <- c(FALSE, TRUE, FALSE, FALSE, FALSE)
+
+
+# Evaluate the model scenarios
+dat_r <- do.call(rbind, mapply(function (scen, model, sigma2) {
+  if (sigma2) {
+    sigma2 <- get(model)$error_var$modelsig2 / get(model)$error_var$modelweights
+    sigma2 <- c(sigma2[1], sigma2[1]*16)
+  } else {
+    sigma2 <- NULL
+  }
+  dat <- sim_eval_components(folder = paste0("modelscen_", scen),
+                                         m_true_comp = get(model),
+                                         label_cov = coef_pho,
+                                         relative =  TRUE,
+                                         fixed_fpc = TRUE,
+                                         sigma2 = sigma2)
+  dat$method <- factor(scen)
+  dat
+}, scen = scenarioA4, model = modelsA4, sigma2 = sigma2, SIMPLIFY = FALSE))
+
+# Adapt the data
+dat <- dat_r %>%
+  filter(comp == "Eigenfunctions") %>%
+  droplevels() %>% 
+  transform(component = factor(ifelse(grepl("E", as.character(no)),
+                                      "E[ijh](t)", "B[i](t)")),
+            no = factor(no, labels = gsub("([1-9])\\]\\^([BE])", "\\2\\1\\](t)",
+                                          levels(no))))
+
+# Plot for mrrMSE values of eigenfunctions
+ggplot2::ggplot(data = dat,
+                aes(y = y, x = no, fill = method)) +
+  geom_boxplot(size = 0.25,
+               outlier.size = 0.25) +
+  facet_grid( ~ component, scales = "free", labeller = label_parsed) +
+  theme_bw(base_size = 12) +
+  theme(axis.title.x=element_blank(),
+        legend.position = "bottom", legend.direction = "horizontal") +
+  scale_x_discrete(labels =function(l) parse(text=l)) +
+  scale_fill_manual(values = fill_valsA4,
+                    guide = guide_legend(nrow = 1, title = "Scenario")) +
+  ylab("mrrMSE")
+ggsave(filename = "app_sim_fpc.png", device = "png", path = plot,
+       dpi = dpi + 200, width = width +4.1, height = height)
+
+# Plot the estimated eigenfunctions for B1 and E1
+components <- c(paste0("B", 1:3), paste0("E", 1:5))
+dat <- do.call(rbind, lapply(components, function (comp) {
+  out <- extract_Eigenfct_sim(
+    number = as.numeric(substr(comp, 2, 2)), component = substr(comp, 1, 1),
+    m_true_comp = c_mul,
+    eigenfcts = load_sim_results(folder = "modelscen_1A",
+                                             component = "eigenfcts"),
+    flip = TRUE)
+  out <- funData2DataFrame(out) %>%
+    mutate(effect = factor(paste0("{psi[", comp, "]}(t)")),
+           source = factor(ifelse(obs != length(unique(obs)), "sim", "tru")),
+           dim = paste0("dim", dim))
+  out
+}))
+
+# Plot the flipped version
+ggplot2::ggplot(data = dat, aes(x = t, y = y, group = obs,
+                                colour = source)) +
+  geom_hline(yintercept = 0, linetype = "dotted", size = 0.3) +
+  geom_line() +
+  facet_grid(dim ~ effect, labeller = label_parsed) +
+  scale_color_manual(values = c("grey80", "red")) +
+  scale_size_manual(values = c(0.3, 0.5, 0.3)) +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "none") +
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1")) +
+  ylab(expression("Eigenfunction (" ~ psi^(d) ~")")) +
+  xlab("Normalized Time (t)")
+ggsave(filename = "app_sim_eigfcts.png", device = "png", path = plot,
+       dpi = dpi + 200, width = width +4.1, height = height)
+
+# Plot the estimated eigenfunctions for B1 and E1 in scenario 5A  
+components <- c(paste0("B", 1:3), paste0("E", 1:5))
+dat <- do.call(rbind, lapply(components, function (comp) {
+  out <- extract_Eigenfct_sim(
+    number = as.numeric(substr(comp, 2, 2)), component = substr(comp, 1, 1),
+    m_true_comp = c_wei,
+    eigenfcts = load_sim_results(folder = "modelscen_5A",
+                                             component = "eigenfcts"),
+    flip = TRUE)
+  out <- funData2DataFrame(out) %>%
+    mutate(effect = factor(paste0("{psi[", comp, "]}(t)")),
+           source = factor(ifelse(obs != length(unique(obs)), "sim", "tru")),
+           dim = paste0("dim", dim))
+  out
+}))
+
+# Plot the flipped version
+ggplot2::ggplot(data = dat, aes(x = t, y = y, group = obs,
+                                colour = source)) +
+  geom_hline(yintercept = 0, linetype = "dotted", size = 0.3) +
+  geom_line() +
+  facet_grid(dim ~ effect, labeller = label_parsed) +
+  scale_color_manual(values = c("grey80", "red")) +
+  scale_size_manual(values = c(0.3, 0.5, 0.3)) +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "none") +
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1")) +
+  ylab(expression("Eigenfunction (" ~ psi^(d) ~")")) +
+  xlab("Normalized Time (t)")
+ggsave(filename = "app_sim_eigfcts_5a.png", device = "png", path = plot,
+       dpi = dpi + 200, width = width +4.1, height = height)
+
+
+# Adapt the data
+dat <- dat_r %>%
+  filter(comp %in% c("Eigenvalues", "sigma^2")) %>%
+  droplevels() %>% 
+  transform(component = factor(case_when(
+              grepl("E", as.character(no)) ~ "E[ijh](t)",
+              grepl("B", as.character(no)) ~ "B[i](t)",
+              grepl("sigma", as.character(no)) ~ "sigma^2")),
+            no = factor(no, labels = gsub("([1-9])\\]\\^([BE])", "\\2\\1\\]",
+                                          levels(no))))
+
+# Plot for mrrMSE values of eigenfunctions
+ggplot2::ggplot(data = dat,
+                aes(y = y, x = no, fill = method)) +
+  geom_boxplot(size = 0.25,
+               outlier.size = 0.25) +
+  facet_wrap( ~ component, scales = "free", labeller = label_parsed) +
+  theme_bw(base_size = 12) +
+  theme(axis.title.x=element_blank(),
+        legend.position = "bottom", legend.direction = "horizontal") +
+  scale_x_discrete(labels =function(l) parse(text=l)) +
+  scale_fill_manual(values = fill_valsA4,
+                    guide = guide_legend(nrow = 1, title = "Scenario")) +
+  ylab("rrMSE")
+ggsave(filename = "app_sim_vars.png", device = "png", path = plot,
+       dpi = dpi + 200, width = width +4.1, height = height)
+
+
+# Snooker Data: Look at 6A (multivariate)
+dat_s <- sim_eval_components(folder = "modelscen_6A",
+                                        m_true_comp = get(sno_models),
+                                        label_cov = coef_sno,
+                                        relative =  TRUE,
+                                        fixed_fpc = TRUE,
+                                        I = 25, J = 2, reps = 6, nested = TRUE)
+
+dat <- dat_s %>% 
+  filter(comp == "Eigenfunctions") %>%
+  droplevels() %>%
+  mutate(component = factor(gsub("\\[[1-9]\\]", "", no), 
+                            labels = c("B[i](t)", "C[ij](t)", "E[ijh](t)")),
+         no = factor(no, labels = gsub("([1-9])\\]\\^([BCE])", "\\2\\1\\](t)",
+                                       levels(no))))
+  
+ggplot2::ggplot(data = dat,
+                aes(y = y, x = no)) +
+  geom_boxplot(size = 0.25,
+               outlier.size = 0.25) +
+  facet_grid( ~ component, scales = "free", labeller = label_parsed) +
+  theme_bw(base_size = 12) +
+  theme(axis.title.x=element_blank(),
+        legend.position = "bottom", legend.direction = "horizontal") +
+  scale_x_discrete(labels =function(l) parse(text=l)) +
+  ylab("mrrMSE")
+ggsave(filename = "app_sim_fpc_sno.png", device = "png", path = plot,
+       dpi = dpi + 200, width = width +4.1, height = height)
+
+
+# Tables for the eigenvalues / variance?
+dat <- dat_s %>%
+  filter(comp %in%  c("sigma^2", "Eigenvalues")) %>%
+  droplevels() %>%
+  transform(component = factor(case_when(
+              grepl("E", as.character(no)) ~ "E[ijh](t)",
+              grepl("B", as.character(no)) ~ "B[i](t)",
+              grepl("C", as.character(no)) ~ "C[ij](t)",
+              grepl("sigma", as.character(no)) ~ "sigma^2")),
+            no = factor(no, labels = gsub("([1-9])\\]\\^([BCE])", 
+                                          "\\2\\1\\]", levels(no))))
+ggplot2::ggplot(data = dat,
+               aes(y = y, x = no)) +
+  geom_boxplot(size = 0.25,
+               outlier.size = 0.25) +
+  facet_grid( ~ component, scales = "free", space = "free", labeller = label_parsed) +
+  theme_bw(base_size = 8) +
+  theme(axis.title.x=element_blank(),
+        legend.position = "bottom", legend.direction = "horizontal") +
+  scale_x_discrete(labels =function(l) parse(text=l)) +
+  scale_y_continuous(limits = c(0, 1.6)) +
+  ylab("rrMSE")
+ggsave(filename = "app_sim_vars_sno.png", device = "png", path = plot,
+       dpi = dpi + 200, width = width +4.1, height = height)
+
+
+
+
+# APPENDIX: Multivariate Plots of Remaining Scenarios ---------------------
+
+scenarioA5 <- c("1A", "2A", "2B", "2C", "2D", "2E", "2F", "5A", "5B", "5C",
+                "5D", "5E")
+fixed_fpcA5 <- c(TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
+                TRUE,  FALSE, FALSE, FALSE, FALSE)
+modelsA5 <- rep(pho_models, c(7, 5)) 
+fill_valsA5 <- c(brewer.pal(n = 7, name = "Blues")[7],
+                rev(brewer.pal(n = 7, name = "Greens")[-1]),
+                rev(brewer.pal(n = 7, name = "Reds")[-c(1, 2)]))
+
+# Evaluate the model scenarios
+dat_r <- do.call(rbind, mapply(function (scen, fixed, model) {
+  dat <- sim_eval_components(folder = paste0("modelscen_", scen),
+                                         m_true_comp = get(model),
+                                         label_cov = coef_pho,
+                                         relative =  TRUE,
+                                         fixed_fpc = fixed)
+  dat$method <- factor(scen)
+  dat
+}, scen = scenarioA5, fixed = fixed_fpcA5, model = modelsA5, SIMPLIFY = FALSE))
+
+# Adapt the model
+dat <- dat_r %>%
+  filter(comp == "Fit") %>%
+  droplevels() %>%
+  transform(no = factor(no, levels = c("Y", "mu", "B", "E"), 
+                        labels = c("y[ijh](t)", "mu(x[ij],t)", "B[i](t)",
+                                   "E[ijh](t)")))
+
+# Plot for fitted functions
+ggplot2::ggplot(data = dat,
+                aes(y = y, fill = method)) +
+  geom_boxplot(size = 0.25, width = 3,
+               outlier.size = 0.25) +
+  facet_wrap( ~ no, scales = "free", labeller = label_parsed, nrow = 1) +
+  theme_bw(base_size = 12) +
+  theme(axis.title.x=element_blank(),
+        legend.position = "bottom", legend.direction = "horizontal") +
+  scale_x_discrete(labels =function(l) parse(text=l)) +
+  scale_fill_manual(values = fill_valsA5,
+                    guide = guide_legend(nrow = 1, title = "Scenario")) +
+  ylab("mrrMSE")
+ggsave(filename = "app_sim_multivariate.png", device = "png", path = plot, 
+       dpi = dpi + 200, width = width +4.1, height = height)
+
+
+
+# APPENDIX: Univariate MSE for Snooker Data -------------------------------
+
+# Evaluate the model scenarios
+dat_s <- sim_eval_dimensions(folder = "modelscen_6A",
+                                         m_true_comp = get(sno_models[1]),
+                                         label_cov = coef_sno,
+                                         uni_compare = FALSE,
+                                         relative = TRUE,
+                                         I = 25, J = 2, reps = 6, nested = TRUE)
+
+# Adapt the model
+dat <- dat_s %>%
+  filter(comp == "Fit") %>%
+  droplevels() %>%
+  mutate(no = factor(no, levels = c("Y", "mu", "B", "C", "E"), 
+                        labels = c("y[ijh](t)", "mu(x[ij],t)", "B[i](t)",
+                                   "C[ij](t)", "E[ijh](t)")),
+         y_new = ifelse(y > 3, NA, y))
+
+# Plot for fitted functions and sigma
+ggplot2::ggplot(data = dat,
+                aes(y = y_new, x = dim)) +
+  geom_boxplot(size = 0.25,
+               outlier.size = 0.25) +
+  facet_wrap(no ~., scales = "free", nrow = 2,
+             labeller = label_parsed) +
+  theme_bw(base_size = 12) +
+  theme(axis.title.x=element_blank(),
+        legend.position = "bottom", legend.direction = "horizontal") +
+  scale_x_discrete(labels =function(l) parse(text=l)) +
+  ylab("urrMSE")
+ggsave(filename = "app_sim_umse_sno.png", device = "png", path = plot, 
+       dpi = dpi + 200, width = width +4.1, height = height+0.9)
+
+
+
+# APPENDIX: Efficiency Gains ----------------------------------------------
+
+aha <- cov_pho %>%
+  filter(scenario %in% c("2U", "1C")) %>%
+  pivot_longer(cols = 3:10, names_to = "effect", names_prefix = "X\\.beta\\.")
+
+plot((aha %>% filter(scenario == "2U"))$value,
+     (aha %>% filter(scenario == "1C"))$value)
+abline(a = 0, b = 1)
+abline(h = 95, col = "blue")
+abline(v = 95, col = "blue")
+
+
+cov_preds1c_a <- load_sim_results(folder = "modelscen_1C", 
+                                  component = "cov_preds")
+cov_preds1c <- load_sim_results(folder = "modelscen_1B",
+                                component = "cov_preds",
+                                uni = TRUE)
+se_ratio <- do.call(rbind, mapply(function(mul, uni, i){
+  
+  # Extract the univariate estimated multiFunData of the se
+  uni_se <- lapply(seq_along(uni[[1]]$se.fit), function (effect) {
+    multiFunData(lapply(uni, function (dim) {
+      dim$se.fit[[effect]]
+    }))
+  })
+  uni_se <- uni_se[unicoefs]
+  names(uni_se) <- names(mul$se.fit)
+  
+  # Multivariate is already in multiFunData form
+  mul_se <- mul$se.fit
+  
+  out <- do.call(rbind, mapply(function (u_se, m_se, effect) {
+    o <- m_se / u_se
+    o <- funData2DataFrame(o)
+    o$obs <- i
+    o$effect <- factor(effect)
+    o
+  }, u_se = uni_se, m_se = mul_se, effect = names(mul_se), SIMPLIFY = FALSE))
+  out 
+  
+}, mul = cov_preds1c_a$mul, uni = cov_preds1c$uni, 
+i = seq_along(cov_preds1c_a$mul), SIMPLIFY = FALSE))
+aha <- se_ratio %>%
+  filter(! (effect == "int" & t != unique(t)[1])) %>%
+  mutate(ratio_larger_1 = y > 1)
+table(aha$dim, aha$ratio_larger_1)
+table(aha$dim, aha$ratio_larger_1)/unique(table(aha$dim))
+table(aha$ratio_larger_1)/nrow(aha)
+oho <- table(aha$ratio_larger_1, aha$effect, aha$dim)
+xtable(t(oho[2, -1, ] / 50000), digits = 2)
+xtable(oho[, 1, ] / 500)
+
+ggplot(data = se_ratio %>% filter(effect == "s(t):.2"), 
+       aes(x = t, y = y, group = t)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_hline(yintercept = 1, linetype = "dotted", size = 0.25, col = "red") +
+  facet_grid(dim ~ .) +
+  theme_bw(base_size = 8)  +
+  theme(legend.position = "bottom", legend.direction = "horizontal") +
+  scale_x_continuous(labels = c("0", "0.25", "0.5", "0.75", "1"))
+
+
+
+
+# APPENDIX: Coverage for Snooker Data -------------------------------------
+
+# Load all the effect estimates from the compared scenarios
+# See APPENDIX: Coverage Plot
+cov_preds <- mapply(function (scen, uni, model) {
+  load_sim_results(folder = paste0("modelscen_", scen), component = "cov_preds",
+                   uni = uni)[[if (uni) "uni" else "mul"]]
+}, scen = scenarioA3, uni = uniA3, model = modelA3, SIMPLIFY = FALSE)
+
+# Rearrange the univariate model so that it has the same structure as the
+# multivariate models
+names(cov_preds)[3] <- "2U"
+cov_preds[[3]] <- lapply(seq_along(cov_preds$`2U`), function (it) {
+  out2 <- lapply(seq_along(cov_preds$`2U`[[it]][[1]]), function (fit) {
+    out <- lapply(seq_along(cov_preds$`2U`[[it]][[1]][[fit]]),
+                  function (effect) {
+      multiFunData(lapply(seq_along(cov_preds$`2U`[[it]]), function (dim) {
+        cov_preds$`2U`[[it]][[dim]][[fit]][[effect]]
+      }))
+    })
+    out <- out[unicoefs]
+    names(out) <- names(cov_preds$`1B`[[it]][[fit]])
+    out
+  })
+  names(out2) <- names(cov_preds$`2U`[[it]][[1]])
+  out2
+})
+
+# Calculate the sum of the absolute deviations from the mean for each estimated
+# function
+abs_dev <- do.call(rbind, lapply(names(cov_preds), function (scen) {
+  do.call(rbind, lapply(seq_along(cov_preds[[scen]]), function (it) {
+  do.call(rbind, lapply(seq_along(cov_preds[[scen]][[it]]$fit), 
+                        function (effect_pos) {
+    dat <- funData2DataFrame(cov_preds[[scen]][[it]]$fit[[effect_pos]]) %>%
+      group_by(dim) %>%
+      mutate(center = abs(c(scale(y, center = TRUE, scale = FALSE)))) %>%
+      summarise(sum_dev = sum(center), .groups = "keep") %>%
+      ungroup() %>%
+      mutate(iter = it, 
+             effect = factor(names(cov_preds[[scen]][[it]]$fit)[effect_pos]),
+             scen = factor(scen))
+  }))
+}))}))
+
+# Sum over all function estimates to get a statistical measure for the 
+# nonlinenarity of the estimates
+dev_meas <- abs_dev %>% 
+  group_by(scen, effect, dim) %>%
+  summarise(sum = sum(sum_dev), .groups = "keep") %>%
+  ungroup() %>%
+  filter(effect != "int") %>%
+  droplevels()
+
+# Use a cut-off criterion to determine whether an effect is estimated as a 
+# constant
+abs_meas <- abs_dev %>%
+  mutate(const = sum_dev < 0.001) %>%
+  group_by(scen, effect, dim) %>%
+  summarise(count = sum(const), .groups = "keep") %>%
+  ungroup() %>%
+  filter(effect != "int") %>%
+  droplevels()
+
+# Use calculated average coverage from APPENDIX: Coverage Plot
+cov_dat <- do.call(rbind, lapply(names(avg_cov), function (scen) {
+  avg_cov[[scen]] %>%
+    pivot_longer(-1, values_to = "coverage", names_to = "effect",
+                 names_transform = list(effect = factor)) %>%
+    mutate(scen = factor(scen), dim = as.numeric(dim))
+}))
+
+# Combine info and calculate correlation
+levels(abs_meas$effect) <- levels(dev_meas$effect) <- levels(cov_dat$effect)
+dev_dat <- left_join(dev_meas, cov_dat)
+dev_dat <- left_join(dev_dat, abs_meas)
+cor(dev_dat$sum, dev_dat$coverage)
+cor(dev_dat$count, dev_dat$coverage)
+
+```
+
