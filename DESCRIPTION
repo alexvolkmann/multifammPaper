@@ -1,11 +1,16 @@
 Package: multifammPaper
 Type: Package
 Title: Convenience Functions for the Analysis of the multiFAMM Paper
-Version: 0.1.0.9001
+Version: 0.1.1
 Authors@R: person("Alexander", "Volkmann", 
     email = "alexander.volkmann@hu-berlin.de", role = c("aut", "cre"))
 Description: Convenience functions used in the analysis of the multiFAMM Paper 
-    but not fit for publication on CRAN.
+    but not fit for publication on CRAN. Vignettes of this package contain
+    the code to enable to reproduce all analyses and simulations of the
+    corresponding paper. This package is supplied as
+    supplementary material to the paper Multivariate Functional Additive Mixed 
+    Models, see e.g. Volkmann et al. (2021, <arXiv:2103.06606>). It is also 
+    available under <https://github.com/alexvolkmann/multifammPaper>.
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
@@ -13,10 +18,13 @@ RoxygenNote: 7.1.1
 Roxygen: list(old_usage = TRUE)
 Depends: R (>= 2.10)
 Imports: multifamm,
+    data.table,
     dplyr,
     expm,
+    funData,
     ggplot2,
     magrittr,
+    mgcv,
     mvtnorm,
     tidyr
 Suggests: 

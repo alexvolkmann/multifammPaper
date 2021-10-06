@@ -111,6 +111,9 @@ around zero for each subject. Defaults to FALSE.}
 
 \item{trajectory}{TRUE: All dimensions are observed at the same time points
 as would be (ideally) the case for the snooker data. Defaults to FALSE.}
+
+\item{equal_grid}{TRUE: Evaluation points are identical over the dimensions
+as would be for movement trajectories. Defaults to FALSE.}
 }
 \description{
 This function creates a new data set based on already a fitted model of type

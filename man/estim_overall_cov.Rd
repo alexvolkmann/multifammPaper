@@ -10,7 +10,23 @@ estim_overall_cov(data, m_mean = c(2, 1), covariate = FALSE,
 }
 \arguments{
 \item{data}{Data.table containig the information needed for the sparseflmm()
-function}
+function.}
+
+\item{m_mean}{Order of penalty for basis function (as in sparseFLMM).}
+
+\item{covariate}{Covariate effects (as in sparseFLMM).}
+
+\item{num_covariates}{Number of covariates included in the model (as in
+sparseFLMM).}
+
+\item{covariate_form}{Vector of strings for type of covariate (as in
+sparseFLMM).}
+
+\item{interaction}{TRUE if there are interactions between covariates (as in
+sparseFLMM). Defaults to \code{FALSE}.}
+
+\item{which_interaction}{Symmetric matrix specifying the interaction terms
+(as in sparseFLMM).}
 }
 \description{
 This function conducts a fast symmetric covariance estimation on some

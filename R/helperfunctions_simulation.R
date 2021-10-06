@@ -68,6 +68,8 @@
 #'   around zero for each subject. Defaults to FALSE.
 #' @param trajectory TRUE: All dimensions are observed at the same time points
 #'   as would be (ideally) the case for the snooker data. Defaults to FALSE.
+#' @param equal_grid TRUE: Evaluation points are identical over the dimensions
+#'   as would be for movement trajectories. Defaults to FALSE.
 #' @export
 gendata <- function(I = 10, J = 10, nested = FALSE, num_dim = 2,
                     lamB, lamC, lamE, normal = TRUE,

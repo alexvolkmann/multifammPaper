@@ -77,7 +77,17 @@ plot_snooker_fit <- function(obs, model, model_comp = NULL) {
 #' giving FPCs.
 #'
 #' @param data Data.table containig the information needed for the sparseflmm()
-#'   function
+#'   function.
+#' @param m_mean Order of penalty for basis function (as in sparseFLMM).
+#' @param covariate Covariate effects (as in sparseFLMM).
+#' @param num_covariates Number of covariates included in the model (as in
+#'   sparseFLMM).
+#' @param covariate_form Vector of strings for type of covariate (as in
+#'   sparseFLMM).
+#' @param interaction TRUE if there are interactions between covariates (as in
+#'   sparseFLMM). Defaults to \code{FALSE}.
+#' @param which_interaction Symmetric matrix specifying the interaction terms
+#'   (as in sparseFLMM).
 estim_overall_cov <- function(data, m_mean = c(2, 1),
                               covariate = FALSE, num_covariates = 4,
                               covariate_form = rep("by", times = 4),
