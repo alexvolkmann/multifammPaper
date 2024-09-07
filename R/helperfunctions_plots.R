@@ -325,10 +325,13 @@ covariance_surf_plot_helper <- function(mcomp, component, dimlabels,
 
   # Create data.frame for plotting
   dat <- data.frame(
-    row_dim = rep(rep(dimlabels, each = length(grid)),
-                  times = length(dimlabels)*length(grid)),
-    col_dim = rep(dimlabels,
-                  each = length(dimlabels) * length(grid) * length(grid)),
+    row_dim = factor(rep(rep(dimlabels, each = length(grid)),
+                         times = length(dimlabels)*length(grid)),
+                     levels = dimlabels),
+    col_dim = factor(rep(dimlabels,
+                         each = length(dimlabels) * length(grid) *
+                           length(grid)),
+                     levels = dimlabels),
     row = as.numeric(rownames(cov_mat)[row(cov_mat)]),
     col = as.numeric(colnames(cov_mat)[col(cov_mat)]),
     value = c(cov_mat)

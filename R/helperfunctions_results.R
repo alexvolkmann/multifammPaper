@@ -503,6 +503,7 @@ funData2DataFrame <- function(fundata) {
       list(argvals = unlist(x@argvals), x = x@X)
     })
   } else {
+    # maybe here list(list(...)) otherwise doesn't work for univariate funData?
     list(argvals = unlist(fundata@argvals), x = fundata@X)
   }
 
